@@ -1,0 +1,188 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:LOG-{YYYY}-{MM}-{DD}-{#####}",
+ "creation": "2026-08-31 21:15:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "session_details_section",
+  "session_id",
+  "project_name",
+  "employee_name",
+  "user",
+  "device_token",
+  "column_break_time",
+  "mode",
+  "status",
+  "from_time",
+  "to_time",
+  "duration_minutes",
+  "total_hours",
+  "content_section",
+  "summary_part_a",
+  "steps_part_b",
+  "technical_section",
+  "git_commits",
+  "files_touched",
+  "raw_work_items"
+ ],
+ "fields": [
+  {
+   "fieldname": "session_details_section",
+   "fieldtype": "Section Break",
+   "label": "Session Metadata"
+  },
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Conversation / Session ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project / Workspace",
+   "reqd": 1
+  },
+  {
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Employee Name"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "fieldname": "device_token",
+   "fieldtype": "Link",
+   "label": "Device Token",
+   "options": "Agent Device Token"
+  },
+  {
+   "fieldname": "column_break_time",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Automatic",
+   "fieldname": "mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tracking Mode",
+   "options": "Automatic\nManual"
+  },
+  {
+   "default": "Completed",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Active\nPaused\nCompleted\nSynced"
+  },
+  {
+   "fieldname": "from_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "From Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "To Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "duration_minutes",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Duration (Minutes)"
+  },
+  {
+   "fieldname": "total_hours",
+   "fieldtype": "Float",
+   "label": "Total Hours"
+  },
+  {
+   "fieldname": "content_section",
+   "fieldtype": "Section Break",
+   "label": "Generated Timesheet Content"
+  },
+  {
+   "fieldname": "summary_part_a",
+   "fieldtype": "Small Text",
+   "label": "Part A: Single-Line Summary"
+  },
+  {
+   "fieldname": "steps_part_b",
+   "fieldtype": "Long Text",
+   "label": "Part B: Step-by-Step Points (I have / I had / I can)"
+  },
+  {
+   "fieldname": "technical_section",
+   "fieldtype": "Section Break",
+   "label": "Technical Metadata & Commits"
+  },
+  {
+   "fieldname": "git_commits",
+   "fieldtype": "Code",
+   "label": "Git Commits",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "files_touched",
+   "fieldtype": "Code",
+   "label": "Files Touched",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "raw_work_items",
+   "fieldtype": "Code",
+   "label": "Raw Work Items / Prompts",
+   "options": "JSON"
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-31 21:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Timesheet Intelligence",
+ "name": "Antigravity Session Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "write": 1
+  }
+ ],
+ "sort_field": "from_time",
+ "sort_order": "DESC",
+ "states": []
+}

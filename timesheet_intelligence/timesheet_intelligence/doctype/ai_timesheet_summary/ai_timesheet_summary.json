@@ -1,0 +1,90 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:SUMMARY-{date}",
+ "creation": "2026-08-31 21:15:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "total_active_developers",
+  "total_logged_hours",
+  "efficiency_score",
+  "summary_section",
+  "executive_summary",
+  "bottlenecks_identified",
+  "project_distribution"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Summary Date",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "total_active_developers",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Active Developers"
+  },
+  {
+   "fieldname": "total_logged_hours",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Total Logged Hours"
+  },
+  {
+   "fieldname": "efficiency_score",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Team Velocity & Efficiency"
+  },
+  {
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "AI Executive Synthesis"
+  },
+  {
+   "fieldname": "executive_summary",
+   "fieldtype": "Text Editor",
+   "label": "Executive Performance Summary"
+  },
+  {
+   "fieldname": "bottlenecks_identified",
+   "fieldtype": "Small Text",
+   "label": "Repetitive Tasks & Bottlenecks"
+  },
+  {
+   "fieldname": "project_distribution",
+   "fieldtype": "Code",
+   "label": "Project Hours Distribution",
+   "options": "JSON"
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-31 21:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Timesheet Intelligence",
+ "name": "AI Timesheet Summary",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": []
+}

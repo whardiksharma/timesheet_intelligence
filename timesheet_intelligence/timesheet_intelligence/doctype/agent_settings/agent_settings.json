@@ -1,0 +1,89 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-31 21:15:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "idle_threshold_minutes",
+  "sync_frequency_seconds",
+  "version_release",
+  "ai_section",
+  "enable_ai_summarization",
+  "gemini_api_key",
+  "default_prompt_style"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "Daemon Configuration"
+  },
+  {
+   "default": "5",
+   "fieldname": "idle_threshold_minutes",
+   "fieldtype": "Int",
+   "label": "Idle Inactivity Threshold (Minutes)",
+   "reqd": 1
+  },
+  {
+   "default": "300",
+   "fieldname": "sync_frequency_seconds",
+   "fieldtype": "Int",
+   "label": "Sync Frequency (Seconds)",
+   "reqd": 1
+  },
+  {
+   "default": "1.0.0",
+   "fieldname": "version_release",
+   "fieldtype": "Data",
+   "label": "Client Release Version"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "AI Performance & Summarizer"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_ai_summarization",
+   "fieldtype": "Check",
+   "label": "Enable AI Timesheet Summarization"
+  },
+  {
+   "fieldname": "gemini_api_key",
+   "fieldtype": "Password",
+   "label": "Gemini / AI API Key"
+  },
+  {
+   "default": "OmmNoMi Executive (Part A + Part B)",
+   "fieldname": "default_prompt_style",
+   "fieldtype": "Select",
+   "label": "Default Output Style",
+   "options": "OmmNoMi Executive (Part A + Part B)\nStandard Bullet Points\nDetailed Commit Breakdown"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-31 21:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Timesheet Intelligence",
+ "name": "Agent Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
