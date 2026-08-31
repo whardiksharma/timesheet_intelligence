@@ -57,11 +57,11 @@
    "label": "Gemini / AI API Key"
   },
   {
-   "default": "OmmNoMi Executive (Part A + Part B)",
+   "default": "Executive Summary (Part A + Part B)",
    "fieldname": "default_prompt_style",
    "fieldtype": "Select",
    "label": "Default Output Style",
-   "options": "OmmNoMi Executive (Part A + Part B)\nStandard Bullet Points\nDetailed Commit Breakdown"
+   "options": "Executive Summary (Part A + Part B)\nStandard Bullet Points\nDetailed Commit Breakdown"
   }
  ],
  "issingle": 1,

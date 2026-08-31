@@ -1,7 +1,7 @@
 [project]
 name = "timesheet_intelligence"
 authors = [
-    { name = "OmmNoMi", email = "nomeshwer@ommnomi.in"}
+    { name = "Hardik Sharma", email = "219646483+whardiksharma@users.noreply.github.com"}
 ]
 description = "Automated Cross-Platform Timesheet Tracking App for Frappe Framework"
 requires-python = ">=3.14"

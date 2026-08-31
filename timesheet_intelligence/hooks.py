@@ -1,8 +1,8 @@
 app_name = "timesheet_intelligence"
 app_title = "Timesheet Intelligence"
-app_publisher = "OmmNoMi"
-app_description = "Automated Cross-Platform Timesheet Tracking App for Frappe Framework"
-app_email = "nomeshwer@ommnomi.in"
+app_publisher = "Hardik Sharma"
+app_description = "Autonomous Developer Activity Tracking App for Frappe Framework"
+app_email = "219646483+whardiksharma@users.noreply.github.com"
 app_license = "mit"
 
 # Apps
@@ -57,7 +57,11 @@ app_license = "mit"
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "login"
+home_page = "index"
+
+website_route_rules = [
+	{"from_route": "/", "to_route": "index"},
+]
 
 # website user home page (by Role)
 # role_home_page = {

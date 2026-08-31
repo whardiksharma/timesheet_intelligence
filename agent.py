@@ -28,13 +28,12 @@ def init_local_storage():
 		default_config = {
 			"device_uuid": str(uuid.uuid4()),
 			"device_name": platform.node(),
-			"server_url": "http://timesheet.lvh.me:8000",
+			"server_url": "http://timesheet.local:8000",
 			"user": "Administrator",
 			"employee_name": "Hardik Sharma",
 			"idle_threshold_seconds": 300,
 			"sync_interval_seconds": 60,
 			"active_workspaces": [
-				"/home/hardi/frappe-bench/version-16/apps/ommnomi_website",
 				"/home/hardi/frappe-bench/version-16/apps/timesheet_intelligence"
 			]
 		}

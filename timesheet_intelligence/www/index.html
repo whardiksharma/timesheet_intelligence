@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timesheet Intelligence | Autonomous Cross-Platform Tracking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1A73E8;
+      --primary-dark: #1557B0;
+      --surface: #0F172A;
+      --card-bg: #FFFFFF;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --success: #10B981;
+      --purple: #8B5CF6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #F8FAFC;
+      color: var(--text-main);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Ambient Background Dot Grid */
+    .ambient-grid {
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Navigation Bar */
+    header {
+      position: sticky;
+      top: 0;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 0.85rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+    }
+
+    .brand-logo-badge {
+      background: linear-gradient(135deg, #1A73E8, #8B5CF6);
+      color: #FFFFFF;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25);
+    }
+
+    .brand-text h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .btn-outline {
+      border-color: var(--border);
+      color: var(--text-main);
+      background: #FFFFFF;
+    }
+    .btn-outline:hover {
+      background: #F1F5F9;
+      border-color: #CBD5E1;
+    }
+
+    .btn-primary {
+      background: var(--surface);
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+    }
+    .btn-primary:hover {
+      background: #1E293B;
+      transform: translateY(-1px);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #1A73E8, #8B5CF6);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    /* Timesheet Viewer Card */
+    .viewer-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+      margin-bottom: 2rem;
+    }
+
+    .viewer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .viewer-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+
+    .copy-btn {
+      background: #EEF2FF;
+      color: #4F46E5;
+      border: 1px solid #C7D2FE;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .copy-btn:hover {
+      background: #4F46E5;
+      color: #FFFFFF;
+    }
+
+    .timesheet-box {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 1.5rem;
+      font-family: monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.7;
+      color: #1E293B;
+    }
+
+    /* Logs Table */
+    .table-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+
+    th {
+      text-align: left;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 14px;
+      font-size: 0.9rem;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .tag-project {
+      background: #EFF6FF;
+      color: #1E40AF;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+
+    .badge-auto {
+      background: #ECFDF5;
+      color: #065F46;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      background: #FFFFFF;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-grid"></div>
+
+  <header>
+    <a href="/" class="brand">
+      <div class="brand-logo-badge">⏱️</div>
+      <div class="brand-text">
+        <h1>Timesheet Intelligence</h1>
+        <p>Autonomous Developer Tracking Engine</p>
+      </div>
+    </a>
+    <div class="nav-actions">
+      <a href="/api/method/timesheet_intelligence.api.get_daily_summary?date={{ today_date }}" target="_blank" class="btn btn-outline">⚡ REST API</a>
+      <a href="/app/antigravity-session-log" class="btn btn-primary">Open Desk App →</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Live Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Today's Total Hours</div>
+        <div class="stat-value">{{ total_hours_display }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Recorded Sessions</div>
+        <div class="stat-value">{{ total_sessions }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Paired Devices</div>
+        <div class="stat-value">{{ active_devices }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Backend Status</div>
+        <div class="stat-value" style="color: #10B981;">Online 🟢</div>
+      </div>
+    </div>
+
+    <!-- Live Timesheet View -->
+    <div class="viewer-card">
+      <div class="viewer-header">
+        <div>
+          <h2 class="viewer-title">Today's Synthesized Timesheet ({{ today_date }})</h2>
+          <p style="font-size: 0.88rem; color: #64748B;">Auto-generated from recorded developer sessions across all projects.</p>
+        </div>
+        <button class="copy-btn" onclick="copyTimesheet()">📋 Copy to Clipboard</button>
+      </div>
+
+      <div class="timesheet-box" id="timesheetText">{% if logs %}### Part A: Single-Line Summary
+{% for l in logs %}{% if l.summary_part_a %}{{ l.summary_part_a }}; {% endif %}{% endfor %}
+
+---
+
+### Part B: Step-by-Step Points
+{% for l in logs %}
+* **[{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}] {{ l.project_name }}** ({{ l.duration_minutes }} mins):
+{{ l.steps_part_b or l.summary_part_a }}
+{% endfor %}
+{% else %}No active sessions recorded yet for today. Start coding or run `python3 agent.py start` to begin auto-tracking!{% endif %}</div>
+    </div>
+
+    <!-- Recent Session Logs Table -->
+    <div class="table-card">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; margin-bottom: 0.5rem;">Recent Session Logs</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Session ID</th>
+            <th>Project</th>
+            <th>Time Window</th>
+            <th>Duration</th>
+            <th>Mode</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in logs %}
+          <tr>
+            <td style="font-family: monospace; font-weight: 600;">{{ l.session_id }}</td>
+            <td><span class="tag-project">{{ l.project_name }}</span></td>
+            <td>{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}</td>
+            <td style="font-weight: 700;">{{ l.duration_minutes }} mins</td>
+            <td><span class="badge-auto">{{ l.mode or 'Automatic' }}</span></td>
+            <td><a href="/app/antigravity-session-log/{{ l.name }}" style="color: #1A73E8; font-weight: 700; text-decoration: none;">View Log →</a></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align: center; color: #94A3B8; padding: 2rem;">No logs found. Run <code>python3 agent.py log</code> to record a session.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer>
+    Timesheet Intelligence &bull; Personal Autonomous Time Tracking Engine &bull; Hosted on <code>timesheet.local</code>
+  </footer>
+
+  <div id="toast" style="position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: white; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 0.88rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 9999; display: flex; align-items: center; gap: 8px;">
+    <span>✅</span> <span id="toastMessage">Copied to clipboard!</span>
+  </div>
+
+  <script>
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMessage');
+      toastMsg.innerText = msg;
+      toast.style.transform = 'translateY(0)';
+      toast.style.opacity = '1';
+      setTimeout(() => {
+        toast.style.transform = 'translateY(100px)';
+        toast.style.opacity = '0';
+      }, 2500);
+    }
+
+    function copyTimesheet() {
+      const text = document.getElementById('timesheetText').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Timesheet copied to clipboard!');
+      }).catch(() => {
+        showToast('Failed to copy');
+      });
+    }
+  </script>
+</body>
+</html>

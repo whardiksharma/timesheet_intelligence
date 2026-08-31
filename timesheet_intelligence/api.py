@@ -13,8 +13,11 @@ def register_device(device_uuid, device_name="Unknown Device", user=None, employ
 		user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
 	
 	if not employee_name:
-		employee = frappe.db.get_value("Employee", {"user_id": user}, ["employee_name", "name"], as_dict=True)
-		employee_name = employee.employee_name if employee else (frappe.db.get_value("User", user, "full_name") or user)
+		if frappe.db.table_exists("Employee"):
+			employee = frappe.db.get_value("Employee", {"user_id": user}, ["employee_name", "name"], as_dict=True)
+			employee_name = employee.employee_name if employee else (frappe.db.get_value("User", user, "full_name") or user)
+		else:
+			employee_name = frappe.db.get_value("User", user, "full_name") or user
 	
 	token_name = f"TOKEN-{device_uuid}"
 	if frappe.db.exists("Agent Device Token", token_name):
@@ -124,7 +127,7 @@ def sync_time_logs(device_uuid, logs):
 
 @frappe.whitelist(allow_guest=True)
 def get_daily_summary(date=None, employee_name=None):
-	"""Generate on-demand OmmNoMi-formatted Part A and Part B timesheet for any date."""
+	"""Generate on-demand developer formatted Part A and Part B timesheet for any date."""
 	if not date:
 		date = getdate()
 	
@@ -182,8 +185,11 @@ def switch_user(device_uuid, new_user):
 	if not frappe.db.exists("Agent Device Token", token_name):
 		register_device(device_uuid, user=new_user)
 	else:
-		employee = frappe.db.get_value("Employee", {"user_id": new_user}, ["employee_name"], as_dict=True)
-		employee_name = employee.employee_name if employee else (frappe.db.get_value("User", new_user, "full_name") or new_user)
+		if frappe.db.table_exists("Employee"):
+			employee = frappe.db.get_value("Employee", {"user_id": new_user}, ["employee_name"], as_dict=True)
+			employee_name = employee.employee_name if employee else (frappe.db.get_value("User", new_user, "full_name") or new_user)
+		else:
+			employee_name = frappe.db.get_value("User", new_user, "full_name") or new_user
 		frappe.db.set_value("Agent Device Token", token_name, {
 			"user": new_user,
 			"employee_name": employee_name,
