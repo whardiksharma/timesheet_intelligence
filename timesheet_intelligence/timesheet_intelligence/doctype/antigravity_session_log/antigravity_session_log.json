@@ -9,6 +9,7 @@
   "session_details_section",
   "session_id",
   "project_name",
+  "sub_project",
   "employee_name",
   "user",
   "device_token",
@@ -47,6 +48,13 @@
    "in_standard_filter": 1,
    "label": "Project / Workspace",
    "reqd": 1
+  },
+  {
+   "fieldname": "sub_project",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sub-Project / Module"
   },
   {
    "fieldname": "employee_name",

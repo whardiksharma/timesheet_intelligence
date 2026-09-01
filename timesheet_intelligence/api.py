@@ -139,7 +139,7 @@ def get_daily_summary(date=None, employee_name=None):
 	logs = frappe.get_all(
 		"Antigravity Session Log",
 		filters=filters,
-		fields=["name", "session_id", "project_name", "employee_name", "from_time", "to_time", "duration_minutes", "total_hours", "summary_part_a", "steps_part_b"],
+		fields=["name", "session_id", "project_name", "sub_project", "employee_name", "from_time", "to_time", "duration_minutes", "total_hours", "summary_part_a", "steps_part_b"],
 		order_by="from_time asc"
 	)
 
@@ -157,10 +157,11 @@ def get_daily_summary(date=None, employee_name=None):
 		from_fmt = format_datetime(l.from_time, "hh:mm a") if l.from_time else ""
 		to_fmt = format_datetime(l.to_time, "hh:mm a") if l.to_time else ""
 		time_tag = f"[{from_fmt} – {to_fmt}]" if from_fmt and to_fmt else ""
+		proj_label = f"{l.project_name} ({l.sub_project})" if l.get("sub_project") else l.project_name
 		if l.steps_part_b:
-			steps_b_parts.append(f"* **{time_tag} {l.project_name}**:\n" + l.steps_part_b)
+			steps_b_parts.append(f"* **{time_tag} {proj_label}**:\n" + l.steps_part_b)
 		elif l.summary_part_a:
-			steps_b_parts.append(f"* **{time_tag}** — {l.summary_part_a}")
+			steps_b_parts.append(f"* **{time_tag} {proj_label}** — {l.summary_part_a}")
 
 	consolidated_b = "\n".join(steps_b_parts)
 
@@ -204,7 +205,7 @@ def switch_user(device_uuid, new_user):
 	}
 
 @frappe.whitelist(allow_guest=True)
-def create_manual_session(project_name, duration_minutes=30, summary_part_a=None, steps_part_b=None, from_time=None, to_time=None, employee_name=None):
+def create_manual_session(project_name, sub_project=None, duration_minutes=30, summary_part_a=None, steps_part_b=None, from_time=None, to_time=None, employee_name=None):
 	"""Log a manual time entry directly from the portal or API."""
 	if not project_name:
 		frappe.throw(_("Project name is required"))
@@ -222,15 +223,17 @@ def create_manual_session(project_name, duration_minutes=30, summary_part_a=None
 	total_hours = round(float(duration_minutes) / 60.0, 2)
 	session_id = f"SES-MANUAL-{frappe.generate_hash(length=8)}"
 	
+	target_title = f"{project_name} - {sub_project}" if sub_project else project_name
 	if not summary_part_a:
-		summary_part_a = f"**I have** completed work on {project_name}."
+		summary_part_a = f"**I have** completed work on {target_title}."
 	if not steps_part_b:
-		steps_part_b = f"* **I have** worked on tasks for {project_name}."
+		steps_part_b = f"* **I have** worked on tasks for {target_title}."
 		
 	doc = frappe.get_doc({
 		"doctype": "Antigravity Session Log",
 		"session_id": session_id,
 		"project_name": project_name,
+		"sub_project": sub_project or "",
 		"employee_name": employee_name or "Hardik Sharma",
 		"user": frappe.session.user if frappe.session.user != "Guest" else "Administrator",
 		"mode": "Manual",

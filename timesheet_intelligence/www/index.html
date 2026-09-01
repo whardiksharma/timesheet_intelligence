@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Timesheet Intelligence | Autonomous & Manual Tracking</title>
+  <title>Timesheet Intelligence | Developer Work Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #2563EB;
@@ -21,6 +21,7 @@
       --danger: #EF4444;
       --purple: #8B5CF6;
       --amber: #F59E0B;
+      --sky: #0284C7;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,11 +36,11 @@
       flex-direction: column;
     }
 
-    /* Ambient Background Dot Grid */
+    /* Dot Grid */
     .ambient-grid {
       position: fixed;
       inset: 0;
-      background-image: radial-gradient(rgba(148, 163, 184, 0.22) 1px, transparent 1px);
+      background-image: radial-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px);
       background-size: 24px 24px;
       pointer-events: none;
       z-index: 0;
@@ -72,20 +73,20 @@
     .brand-logo-badge {
       background: linear-gradient(135deg, #2563EB, #8B5CF6);
       color: #FFFFFF;
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
+      font-size: 1.3rem;
       font-weight: 800;
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
     }
 
     .brand-text h1 {
       font-family: 'Outfit', sans-serif;
-      font-size: 1.18rem;
+      font-size: 1.2rem;
       font-weight: 800;
       letter-spacing: -0.02em;
     }
@@ -96,12 +97,52 @@
       font-weight: 600;
     }
 
+    /* Profile Pill in Header */
+    .profile-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 30px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+
+    .profile-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2563EB, #0284C7);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+
+    .profile-meta h4 {
+      font-size: 0.85rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .profile-meta span {
+      font-size: 0.72rem;
+      color: #10B981;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .date-navigator {
       display: flex;
       align-items: center;
       gap: 6px;
       background: #F1F5F9;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 12px;
       border: 1px solid #CBD5E1;
     }
@@ -182,7 +223,7 @@
     /* Main Container */
     main {
       flex: 1;
-      max-width: 1200px;
+      max-width: 1240px;
       width: 100%;
       margin: 1.5rem auto;
       padding: 0 1.5rem;
@@ -190,80 +231,230 @@
       z-index: 1;
     }
 
-    /* Live Timer Widget Card */
-    .timer-card {
-      background: linear-gradient(135deg, #0F172A, #1E293B);
-      color: #FFFFFF;
+    /* Live Studio Workspace Card */
+    .studio-card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 1.5rem 2rem;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+      padding: 1.75rem 2rem;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
       margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .studio-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, #2563EB, #8B5CF6, #0284C7);
+    }
+
+    .studio-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.5rem;
       flex-wrap: wrap;
-      gap: 1.25rem;
+      gap: 1rem;
     }
 
-    .timer-left {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .timer-display {
-      font-family: 'Outfit', monospace;
-      font-size: 2.25rem;
+    .studio-title h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
       font-weight: 800;
-      letter-spacing: 0.05em;
-      color: #38BDF8;
-      background: rgba(0, 0, 0, 0.35);
-      padding: 6px 18px;
-      border-radius: 12px;
-      border: 1px solid rgba(56, 189, 248, 0.25);
     }
 
-    .timer-inputs {
+    .studio-title p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Hierarchy Selectors Grid */
+    .hierarchy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      background: #F8FAFC;
+      padding: 1.25rem;
+      border-radius: 14px;
+      border: 1px solid #E2E8F0;
+    }
+
+    .form-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
-    .timer-inputs label {
-      font-size: 0.75rem;
-      color: #94A3B8;
-      font-weight: 700;
+    .form-group label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: #475569;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
 
-    .timer-inputs input {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #FFFFFF;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 0.95rem;
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #CBD5E1;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.92rem;
       font-weight: 600;
       outline: none;
-      width: 240px;
+      background: #FFFFFF;
+      color: var(--text-main);
+      transition: all 0.2s;
     }
-    .timer-inputs input:focus {
-      border-color: #38BDF8;
-      background: rgba(255, 255, 255, 0.15);
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    .timer-actions {
+    /* Timer & Action Bar */
+    .studio-controls {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      justify-content: space-between;
+      background: #0F172A;
+      color: #FFFFFF;
+      padding: 1.25rem 1.75rem;
+      border-radius: 16px;
+      margin-bottom: 1.75rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .stopwatch-box {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .stopwatch-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #38BDF8;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .stopwatch-status {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #94A3B8;
+    }
+
+    /* Real-Time Continuous Stream Input */
+    .stream-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .stream-section h3 {
+      font-size: 0.95rem;
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chips-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .chip-btn {
+      background: #EEF2FF;
+      color: #4F46E5;
+      border: 1px solid #C7D2FE;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip-btn:hover {
+      background: #4F46E5;
+      color: #FFFFFF;
+    }
+
+    .stream-input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .stream-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .stream-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    /* Activity Stream Feed */
+    .stream-feed {
+      max-height: 220px;
+      overflow-y: auto;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .stream-item {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      animation: fadeIn 0.2s ease-in;
+    }
+
+    .stream-item-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #64748B;
+      font-weight: 600;
+      background: #F1F5F9;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     /* Stats Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
     }
@@ -352,7 +543,7 @@
       border: 1px solid #E2E8F0;
       border-radius: 12px;
       padding: 1.5rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
       font-size: 0.92rem;
       white-space: pre-wrap;
       word-break: break-word;
@@ -400,6 +591,16 @@
       font-size: 0.82rem;
     }
 
+    .tag-subproject {
+      background: #F3E8FF;
+      color: #7E22CE;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      margin-left: 6px;
+    }
+
     .badge-auto {
       background: #ECFDF5;
       color: #065F46;
@@ -418,11 +619,11 @@
       font-weight: 700;
     }
 
-    /* Modal Backdrop & Dialog */
+    /* Modal Backdrop */
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.6);
+      background: rgba(15, 23, 42, 0.65);
       backdrop-filter: blur(4px);
       z-index: 999;
       display: none;
@@ -434,7 +635,7 @@
     .modal-dialog {
       background: #FFFFFF;
       border-radius: 20px;
-      max-width: 600px;
+      max-width: 620px;
       width: 100%;
       box-shadow: 0 20px 50px rgba(0,0,0,0.25);
       border: 1px solid var(--border);
@@ -476,33 +677,6 @@
       gap: 1.25rem;
     }
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .form-group label {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--text-main);
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 10px 14px;
-      border: 1px solid #CBD5E1;
-      border-radius: 10px;
-      font-family: inherit;
-      font-size: 0.92rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .form-control:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-    }
-
     .modal-footer {
       padding: 1.25rem 1.75rem;
       background: #F8FAFC;
@@ -526,15 +700,24 @@
 <body>
   <div class="ambient-grid"></div>
 
-  <!-- Header -->
+  <!-- Top Header -->
   <header>
     <a href="/" class="brand">
       <div class="brand-logo-badge">⏱️</div>
       <div class="brand-text">
         <h1>Timesheet Intelligence</h1>
-        <p>Personal Autonomous & Manual Tracking</p>
+        <p>Developer Work & Activity Studio</p>
       </div>
     </a>
+
+    <!-- Developer Profile Pill -->
+    <div class="profile-pill">
+      <div class="profile-avatar">HS</div>
+      <div class="profile-meta">
+        <h4>{{ user_name }}</h4>
+        <span><span style="font-size: 8px;">🟢</span> Lead Developer</span>
+      </div>
+    </div>
 
     <!-- Date Navigator -->
     <div class="date-navigator">
@@ -542,61 +725,134 @@
       <input type="date" id="dateSelector" value="{{ today_date }}" onchange="navigateDate(this.value)">
     </div>
 
-    <!-- Actions -->
+    <!-- Top Action Buttons -->
     <div class="nav-actions">
-      <button class="btn btn-primary" onclick="openManualModal()">➕ Log Manual Session</button>
+      <button class="btn btn-primary" onclick="openDirectModal()">➕ Quick Log</button>
       <a href="/api/method/timesheet_intelligence.api.get_daily_summary?date={{ today_date }}" target="_blank" class="btn btn-outline">⚡ REST API</a>
       <a href="/app/antigravity-session-log" class="btn btn-outline">Desk App →</a>
     </div>
   </header>
 
   <main>
-    <!-- Live Stopwatch & Quick Tracking Bar -->
-    <div class="timer-card">
-      <div class="timer-left">
-        <div class="timer-display" id="timerDisplay">00:00:00</div>
-        <div class="timer-inputs">
-          <label>Active Project</label>
-          <input type="text" id="activeProjectInput" placeholder="e.g. Timesheet Intelligence" value="Timesheet Intelligence" list="projectSuggestions">
-          <datalist id="projectSuggestions">
-            {% for p in available_projects %}
-            <option value="{{ p }}">
-            {% endfor %}
-          </datalist>
+    <!-- Studio Workspace & Live Stream Builder -->
+    <div class="studio-card">
+      <div class="studio-header">
+        <div class="studio-title">
+          <h2>🚀 Active Session Studio</h2>
+          <p>Select your project hierarchy, start coding, and stream your continuous actions in real-time.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="finishAndSaveBtn" class="btn btn-success" onclick="finishCurrentSession()" disabled>💾 Finish & Save Session</button>
         </div>
       </div>
-      <div class="timer-actions">
-        <button id="startTimerBtn" class="btn btn-success" onclick="toggleTimer()">▶ Start Timer</button>
-        <button id="logTimerBtn" class="btn btn-outline" style="color: #FFFFFF; border-color: rgba(255,255,255,0.3);" onclick="finishAndLogTimer()" disabled>⏹ Finish & Log</button>
+
+      <!-- Project Hierarchy Selector Grid -->
+      <div class="hierarchy-grid">
+        <div class="form-group">
+          <label>1. Main Project *</label>
+          <select id="mainProjectSelect" class="form-control" onchange="onProjectChange()">
+            {% for proj in projects_hierarchy.keys() %}
+            <option value="{{ proj }}">{{ proj }}</option>
+            {% endfor %}
+            <option value="__custom__">+ Custom Project...</option>
+          </select>
+          <input type="text" id="customProjectInput" class="form-control" placeholder="Enter new project name" style="display: none; margin-top: 6px;">
+        </div>
+
+        <div class="form-group">
+          <label>2. Sub-Project / Module *</label>
+          <select id="subProjectSelect" class="form-control" onchange="onSubProjectChange()">
+            <!-- Populated via JS -->
+          </select>
+          <input type="text" id="customSubProjectInput" class="form-control" placeholder="Enter custom sub-project" style="display: none; margin-top: 6px;">
+        </div>
+
+        <div class="form-group">
+          <label>3. Activity Category</label>
+          <select id="activityTypeSelect" class="form-control">
+            <option value="Feature Development">✨ Feature Development</option>
+            <option value="Bug Fixing & Debugging">🐛 Bug Fixing & Debugging</option>
+            <option value="Code Refactoring">♻️ Code Refactoring</option>
+            <option value="Architecture & Design">📐 Architecture & Design</option>
+            <option value="Testing & Validation">🧪 Testing & Validation</option>
+            <option value="Investigation & Research">🔍 Investigation & Research</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Live Stopwatch Control Bar -->
+      <div class="studio-controls">
+        <div class="stopwatch-box">
+          <div class="stopwatch-time" id="sessionStopwatch">00:00:00</div>
+          <div>
+            <div class="stopwatch-status" id="sessionStatus">Status: Idle (Ready to track)</div>
+            <div style="font-size: 0.78rem; color: #38BDF8;" id="sessionTag">Timesheet Intelligence &bull; Web Portal Dashboard</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button id="startSessionBtn" class="btn btn-success" onclick="toggleSessionTimer()">▶ Start Working</button>
+          <button id="resetSessionBtn" class="btn btn-outline" style="color: #FFFFFF; border-color: rgba(255,255,255,0.3);" onclick="resetSessionTimer()">↺ Reset</button>
+        </div>
+      </div>
+
+      <!-- Real-Time Activity Stream ("What I'm doing right now") -->
+      <div class="stream-section">
+        <h3>
+          <span>✍️ Live Activity Stream</span>
+          <span style="font-size: 0.75rem; font-weight: 600; color: #64748B;">(Continuously log what you opened, created, modified, or tested)</span>
+        </h3>
+        
+        <!-- Prefix helper chips -->
+        <div class="chips-bar">
+          <button class="chip-btn" onclick="insertPrefix('**I have** ')">+ **I have**</button>
+          <button class="chip-btn" onclick="insertPrefix('**I had** ')">+ **I had**</button>
+          <button class="chip-btn" onclick="insertPrefix('**I can** ')">+ **I can**</button>
+          <button class="chip-btn" onclick="insertPrefix('**I have** created ')">+ Created</button>
+          <button class="chip-btn" onclick="insertPrefix('**I have** fixed ')">+ Fixed</button>
+          <button class="chip-btn" onclick="insertPrefix('**I have** implemented ')">+ Implemented</button>
+          <button class="chip-btn" onclick="insertPrefix('**I can** verify ')">+ Verify</button>
+        </div>
+
+        <div class="stream-input-group">
+          <input type="text" id="streamActionInput" class="stream-input" placeholder="e.g. Created manual timesheet modal and wired API endpoint..." onkeydown="if(event.key==='Enter') addStreamItem()">
+          <button class="btn btn-primary" onclick="addStreamItem()">+ Add to Session</button>
+        </div>
+
+        <!-- Live Activity Stream Feed List -->
+        <div class="stream-feed" id="streamFeed">
+          <div id="emptyFeedNotice" style="text-align: center; color: #94A3B8; font-size: 0.85rem; padding: 10px;">
+            No action stream items added yet for this session. Type an item above and press Enter!
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Stats Grid -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Date Total Hours</div>
+        <div class="stat-label">Total Hours ({{ today_date }})</div>
         <div class="stat-value" id="statHours">{{ total_hours_display }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Recorded Sessions</div>
+        <div class="stat-label">Logged Sessions</div>
         <div class="stat-value" id="statSessions">{{ total_sessions }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Active Paired Devices</div>
-        <div class="stat-value">{{ active_devices }}</div>
+        <div class="stat-label">Active Developer</div>
+        <div class="stat-value" style="font-size: 1.3rem; color: #2563EB;">Hardik Sharma</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Backend Status</div>
-        <div class="stat-value" style="color: #10B981;">Online 🟢</div>
+        <div class="stat-label">Daemon Sync Status</div>
+        <div class="stat-value" style="color: #10B981; font-size: 1.3rem;">Connected 🟢</div>
       </div>
     </div>
 
-    <!-- Live Timesheet View -->
+    <!-- Synthesized Daily Timesheet View (Part A + Part B) -->
     <div class="viewer-card">
       <div class="viewer-header">
         <div>
           <h2 class="viewer-title">Synthesized Daily Timesheet ({{ today_date }})</h2>
-          <p style="font-size: 0.88rem; color: #64748B;">Auto-generated Executive Part A and Part B formatted report.</p>
+          <p style="font-size: 0.88rem; color: #64748B;">Executive Single-Line Summary (Part A) and Step-by-Step Points (Part B).</p>
         </div>
         <button class="copy-btn" onclick="copyTimesheet()">📋 Copy to Clipboard</button>
       </div>
@@ -608,23 +864,23 @@
 
 ### Part B: Step-by-Step Points
 {% for l in logs %}
-* **[{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}] {{ l.project_name }}** ({{ l.duration_minutes }} mins):
+* **[{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}] {{ l.project_name }}{% if l.sub_project %} ({{ l.sub_project }}){% endif %}** ({{ l.duration_minutes }} mins):
 {{ l.steps_part_b or l.summary_part_a }}
 {% endfor %}
-{% else %}No active sessions recorded yet for {{ today_date }}. Use the "➕ Log Manual Session" button above or start coding with `python3 agent.py start` to log work!{% endif %}</div>
+{% else %}No active sessions recorded yet for {{ today_date }}. Use the Active Session Studio above to start tracking and streaming work!{% endif %}</div>
     </div>
 
     <!-- Recent Session Logs Table -->
     <div class="table-card">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-        <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem;">Session Logs ({{ today_date }})</h3>
-        <button class="btn btn-outline" style="font-size: 0.8rem; padding: 5px 12px;" onclick="window.location.reload()">🔄 Refresh</button>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;">
+        <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem;">Session Records ({{ today_date }})</h3>
+        <button class="btn btn-outline" style="font-size: 0.8rem; padding: 5px 12px;" onclick="window.location.reload()">🔄 Refresh Table</button>
       </div>
       <table>
         <thead>
           <tr>
             <th>Session ID</th>
-            <th>Project</th>
+            <th>Project Hierarchy</th>
             <th>Time Window</th>
             <th>Duration</th>
             <th>Mode</th>
@@ -635,7 +891,12 @@
           {% for l in logs %}
           <tr id="row-{{ l.name }}">
             <td style="font-family: monospace; font-weight: 600;">{{ l.session_id }}</td>
-            <td><span class="tag-project">{{ l.project_name }}</span></td>
+            <td>
+              <span class="tag-project">{{ l.project_name }}</span>
+              {% if l.sub_project %}
+                <span class="tag-subproject">{{ l.sub_project }}</span>
+              {% endif %}
+            </td>
             <td>{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}</td>
             <td style="font-weight: 700;">{{ l.duration_minutes }} mins</td>
             <td>
@@ -654,7 +915,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" style="text-align: center; color: #94A3B8; padding: 2.5rem;">No sessions logged for {{ today_date }}. Click <strong>➕ Log Manual Session</strong> to add one!</td>
+            <td colspan="6" style="text-align: center; color: #94A3B8; padding: 2.5rem;">No sessions logged for {{ today_date }}. Use the Active Session Studio above to track your work!</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -662,54 +923,319 @@
     </div>
   </main>
 
-  <!-- Manual Logging Modal -->
-  <div class="modal-backdrop" id="manualModal">
+  <!-- Quick Log Modal Dialog -->
+  <div class="modal-backdrop" id="directModal">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3>➕ Log Work Session</h3>
-        <button class="modal-close" onclick="closeManualModal()">&times;</button>
+        <h3>➕ Quick Manual Entry</h3>
+        <button class="modal-close" onclick="closeDirectModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Project / Workspace Name *</label>
-          <input type="text" id="manualProject" class="form-control" placeholder="e.g. Timesheet Intelligence" list="projectSuggestions" required>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Main Project *</label>
+            <input type="text" id="quickProject" class="form-control" value="Timesheet Intelligence" required>
+          </div>
+          <div class="form-group">
+            <label>Sub-Project / Module</label>
+            <input type="text" id="quickSubProject" class="form-control" placeholder="e.g. Web Portal Dashboard">
+          </div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div class="form-group">
             <label>Duration (Minutes) *</label>
-            <input type="number" id="manualDuration" class="form-control" placeholder="30" value="30" min="1" required>
+            <input type="number" id="quickDuration" class="form-control" value="30" min="1" required>
           </div>
           <div class="form-group">
-            <label>Employee Profile</label>
-            <input type="text" id="manualEmployee" class="form-control" value="Hardik Sharma">
+            <label>Developer</label>
+            <input type="text" id="quickEmployee" class="form-control" value="{{ user_name }}" readonly>
           </div>
         </div>
         <div class="form-group">
           <label>Part A: Single-Line Summary</label>
-          <input type="text" id="manualSummaryA" class="form-control" placeholder="**I have** completed feature implementation on...">
+          <input type="text" id="quickSummaryA" class="form-control" placeholder="**I have** completed work on...">
         </div>
         <div class="form-group">
-          <label>Part B: Step-by-Step Points (I have / I had / I can)</label>
-          <textarea id="manualStepsB" class="form-control" rows="4" placeholder="* **I have** implemented...&#10;* **I had** reviewed...&#10;* **I can** verify that..."></textarea>
+          <label>Part B: Step-by-Step Points</label>
+          <textarea id="quickStepsB" class="form-control" rows="4" placeholder="* **I have** implemented...&#10;* **I had** reviewed...&#10;* **I can** confirm..."></textarea>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeManualModal()">Cancel</button>
-        <button class="btn btn-primary" id="saveManualBtn" onclick="submitManualSession()">Save & Add to Timesheet</button>
+        <button class="btn btn-outline" onclick="closeDirectModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveQuickBtn" onclick="submitQuickSession()">Save to Timesheet</button>
       </div>
     </div>
   </div>
 
   <footer>
-    Timesheet Intelligence &bull; Personal Autonomous & Manual Time Tracking Engine &bull; Hosted on <code>timesheet.local</code>
+    Timesheet Intelligence &bull; Personal Autonomous & Manual Time Tracking Engine &bull; Developed by Hardik Sharma
   </footer>
 
-  <!-- Toast Notification -->
+  <!-- Toast Notification Container -->
   <div id="toast" style="position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: white; padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 0.88rem; box-shadow: 0 10px 25px rgba(0,0,0,0.25); transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 9999; display: flex; align-items: center; gap: 8px;">
     <span id="toastIcon">✅</span> <span id="toastMessage">Copied to clipboard!</span>
   </div>
 
   <script>
+    /* Project Hierarchy Dictionary */
+    const hierarchyData = {{ projects_hierarchy | tojson }};
+
+    function onProjectChange() {
+      const projSelect = document.getElementById('mainProjectSelect');
+      const subSelect = document.getElementById('subProjectSelect');
+      const customProjInput = document.getElementById('customProjectInput');
+      const val = projSelect.value;
+
+      if (val === '__custom__') {
+        customProjInput.style.display = 'block';
+        customProjInput.focus();
+        subSelect.innerHTML = '<option value="__custom_sub__">+ Custom Sub-Project...</option>';
+        onSubProjectChange();
+      } else {
+        customProjInput.style.display = 'none';
+        const subList = hierarchyData[val] || ['Core Tasks', 'Feature Development', 'Bug Fixes'];
+        subSelect.innerHTML = subList.map(s => `<option value="${s}">${s}</option>`).join('') + '<option value="__custom_sub__">+ Custom Sub-Project...</option>';
+        onSubProjectChange();
+      }
+      updateSessionTag();
+    }
+
+    function onSubProjectChange() {
+      const subSelect = document.getElementById('subProjectSelect');
+      const customSubInput = document.getElementById('customSubProjectInput');
+      if (subSelect.value === '__custom_sub__') {
+        customSubInput.style.display = 'block';
+        customSubInput.focus();
+      } else {
+        customSubInput.style.display = 'none';
+      }
+      updateSessionTag();
+    }
+
+    function getSelectedProject() {
+      const projSelect = document.getElementById('mainProjectSelect');
+      return projSelect.value === '__custom__' ? document.getElementById('customProjectInput').value.trim() : projSelect.value;
+    }
+
+    function getSelectedSubProject() {
+      const subSelect = document.getElementById('subProjectSelect');
+      return subSelect.value === '__custom_sub__' ? document.getElementById('customSubProjectInput').value.trim() : subSelect.value;
+    }
+
+    function updateSessionTag() {
+      const proj = getSelectedProject() || 'Select Project';
+      const sub = getSelectedSubProject() || 'Select Module';
+      document.getElementById('sessionTag').innerText = `${proj} • ${sub}`;
+    }
+
+    // Initialize Hierarchy Dropdowns
+    onProjectChange();
+
+    /* Active Session Stopwatch & Continuous Stream State */
+    let sessionInterval = null;
+    let sessionSeconds = 0;
+    let isSessionRunning = false;
+    let streamItems = [];
+    let sessionStartTime = null;
+
+    function formatStopwatch(sec) {
+      const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+      const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
+
+    function toggleSessionTimer() {
+      const btn = document.getElementById('startSessionBtn');
+      const status = document.getElementById('sessionStatus');
+      const finishBtn = document.getElementById('finishAndSaveBtn');
+
+      if (!isSessionRunning) {
+        isSessionRunning = true;
+        if (!sessionStartTime) sessionStartTime = new Date();
+        btn.innerText = '⏸ Pause Working';
+        btn.style.background = '#F59E0B';
+        status.innerText = 'Status: Active Coding Session 🟢';
+        status.style.color = '#38BDF8';
+        finishBtn.removeAttribute('disabled');
+
+        sessionInterval = setInterval(() => {
+          sessionSeconds++;
+          document.getElementById('sessionStopwatch').innerText = formatStopwatch(sessionSeconds);
+        }, 1000);
+      } else {
+        isSessionRunning = false;
+        btn.innerText = '▶ Resume Working';
+        btn.style.background = '#10B981';
+        status.innerText = 'Status: Session Paused ⏸️';
+        status.style.color = '#F59E0B';
+        clearInterval(sessionInterval);
+      }
+    }
+
+    function resetSessionTimer() {
+      if (sessionSeconds > 0 && !confirm("Reset current session stopwatch and clear stream?")) return;
+      clearInterval(sessionInterval);
+      isSessionRunning = false;
+      sessionSeconds = 0;
+      streamItems = [];
+      sessionStartTime = null;
+      document.getElementById('sessionStopwatch').innerText = '00:00:00';
+      document.getElementById('startSessionBtn').innerText = '▶ Start Working';
+      document.getElementById('startSessionBtn').style.background = '#10B981';
+      document.getElementById('sessionStatus').innerText = 'Status: Idle (Ready to track)';
+      document.getElementById('sessionStatus').style.color = '#94A3B8';
+      document.getElementById('finishAndSaveBtn').setAttribute('disabled', 'true');
+      renderStreamFeed();
+    }
+
+    /* Continuous Activity Stream Methods */
+    function insertPrefix(prefix) {
+      const input = document.getElementById('streamActionInput');
+      input.value = prefix + input.value.replace(/^(\*\*I have\*\*|\*\*I had\*\*|\*\*I can\*\*)\s*/, '');
+      input.focus();
+    }
+
+    function addStreamItem() {
+      const input = document.getElementById('streamActionInput');
+      let text = input.value.trim();
+      if (!text) return;
+
+      if (!text.startsWith('**I have**') && !text.startsWith('**I had**') && !text.startsWith('**I can**')) {
+        text = '**I have** ' + text;
+      }
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      streamItems.push({ text: text, time: timeStr });
+      input.value = '';
+      renderStreamFeed();
+      showToast('Action added to stream!');
+
+      // Automatically start timer if not running
+      if (!isSessionRunning && sessionSeconds === 0) {
+        toggleSessionTimer();
+      }
+    }
+
+    function renderStreamFeed() {
+      const feed = document.getElementById('streamFeed');
+      if (streamItems.length === 0) {
+        feed.innerHTML = '<div id="emptyFeedNotice" style="text-align: center; color: #94A3B8; font-size: 0.85rem; padding: 10px;">No action stream items added yet for this session. Type an item above and press Enter!</div>';
+        return;
+      }
+
+      feed.innerHTML = streamItems.map((item, idx) => `
+        <div class="stream-item">
+          <div>
+            <span style="color: #2563EB; font-weight: 700;">•</span>
+            <span style="font-weight: 600; color: #1E293B; margin-left: 6px;">${item.text}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="stream-item-time">${item.time}</span>
+            <button onclick="removeStreamItem(${idx})" style="background:none; border:none; color:#EF4444; cursor:pointer; font-weight:bold;">&times;</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function removeStreamItem(idx) {
+      streamItems.splice(idx, 1);
+      renderStreamFeed();
+    }
+
+    /* Finish & Save Active Session */
+    function finishCurrentSession() {
+      clearInterval(sessionInterval);
+      isSessionRunning = false;
+
+      const durationMins = Math.max(1, Math.round(sessionSeconds / 60));
+      const mainProj = getSelectedProject() || 'Timesheet Intelligence';
+      const subProj = getSelectedSubProject() || 'Core Development';
+      const category = document.getElementById('activityTypeSelect').value;
+
+      // Synthesize Part A & Part B
+      let summaryA = "";
+      let stepsB = "";
+
+      if (streamItems.length > 0) {
+        const itemTexts = streamItems.map(s => s.text.replace(/^\*\*(I have|I had|I can)\*\*\s*/, ''));
+        summaryA = `**I have** completed ${category.toLowerCase()} on ${mainProj} (${subProj}): ` + itemTexts.join('; ') + '.';
+        stepsB = streamItems.map(s => `* ${s.text}`).join('\n');
+      } else {
+        summaryA = `**I have** completed ${durationMins} minutes of ${category.toLowerCase()} on ${mainProj} (${subProj}).`;
+        stepsB = `* **I have** worked on ${mainProj} (${subProj}) - ${category}.\n* **I can** verify active progress.`;
+      }
+
+      // Pre-fill and open quick modal
+      openDirectModal();
+      document.getElementById('quickProject').value = mainProj;
+      document.getElementById('quickSubProject').value = subProj;
+      document.getElementById('quickDuration').value = durationMins;
+      document.getElementById('quickSummaryA').value = summaryA;
+      document.getElementById('quickStepsB').value = stepsB;
+    }
+
+    /* Quick Modal Controls & Submission */
+    function openDirectModal() {
+      document.getElementById('directModal').style.display = 'flex';
+    }
+
+    function closeDirectModal() {
+      document.getElementById('directModal').style.display = 'none';
+    }
+
+    function submitQuickSession() {
+      const proj = document.getElementById('quickProject').value.trim();
+      const subProj = document.getElementById('quickSubProject').value.trim();
+      const duration = document.getElementById('quickDuration').value.trim();
+      const summaryA = document.getElementById('quickSummaryA').value.trim();
+      const stepsB = document.getElementById('quickStepsB').value.trim();
+
+      if (!proj) {
+        alert('Please enter a project name.');
+        return;
+      }
+
+      const saveBtn = document.getElementById('saveQuickBtn');
+      saveBtn.innerText = 'Saving...';
+      saveBtn.setAttribute('disabled', 'true');
+
+      const formData = new FormData();
+      formData.append('project_name', proj);
+      formData.append('sub_project', subProj);
+      formData.append('duration_minutes', duration || 30);
+      formData.append('summary_part_a', summaryA);
+      formData.append('steps_part_b', stepsB);
+      formData.append('employee_name', 'Hardik Sharma');
+
+      fetch('/api/method/timesheet_intelligence.api.create_manual_session', {
+        method: 'POST',
+        body: formData
+      })
+      .then(r => r.json())
+      .then(res => {
+        saveBtn.innerText = 'Save to Timesheet';
+        saveBtn.removeAttribute('disabled');
+        if (res.message && res.message.status === 'success') {
+          closeDirectModal();
+          showToast('Session logged successfully!');
+          resetSessionTimer();
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        } else {
+          alert('Error: ' + (res.message || 'Could not save session'));
+        }
+      })
+      .catch(err => {
+        saveBtn.innerText = 'Save to Timesheet';
+        saveBtn.removeAttribute('disabled');
+        alert('Network error communicating with server.');
+      });
+    }
+
     /* Date Navigation */
     function navigateDate(dateStr) {
       if (dateStr) {
@@ -717,7 +1243,7 @@
       }
     }
 
-    /* Toast Alert */
+    /* Toast Notification */
     function showToast(msg, icon = '✅') {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMessage');
@@ -742,132 +1268,9 @@
       });
     }
 
-    /* Stopwatch Timer Logic */
-    let timerInterval = null;
-    let timerSeconds = 0;
-    let isTimerRunning = false;
-
-    function formatTimerDisplay(totalSeconds) {
-      const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-      const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-      const s = String(totalSeconds % 60).padStart(2, '0');
-      return `${h}:${m}:${s}`;
-    }
-
-    function toggleTimer() {
-      const btn = document.getElementById('startTimerBtn');
-      const logBtn = document.getElementById('logTimerBtn');
-      if (!isTimerRunning) {
-        isTimerRunning = true;
-        btn.innerText = '⏸ Pause Timer';
-        btn.style.background = '#F59E0B';
-        logBtn.removeAttribute('disabled');
-        logBtn.style.color = '#FFFFFF';
-        timerInterval = setInterval(() => {
-          timerSeconds++;
-          document.getElementById('timerDisplay').innerText = formatTimerDisplay(timerSeconds);
-        }, 1000);
-      } else {
-        isTimerRunning = false;
-        btn.innerText = '▶ Resume Timer';
-        btn.style.background = '#10B981';
-        clearInterval(timerInterval);
-      }
-    }
-
-    function finishAndLogTimer() {
-      if (timerSeconds < 60) {
-        if (!confirm("Timer is less than 1 minute. Log it as 1 minute?")) return;
-      }
-      clearInterval(timerInterval);
-      isTimerRunning = false;
-      const durationMins = Math.max(1, Math.round(timerSeconds / 60));
-      const project = document.getElementById('activeProjectInput').value.trim() || 'Timesheet Intelligence';
-      
-      // Reset Timer UI
-      timerSeconds = 0;
-      document.getElementById('timerDisplay').innerText = '00:00:00';
-      document.getElementById('startTimerBtn').innerText = '▶ Start Timer';
-      document.getElementById('startTimerBtn').style.background = '#10B981';
-      document.getElementById('logTimerBtn').setAttribute('disabled', 'true');
-
-      // Open Modal Pre-filled
-      openManualModal();
-      document.getElementById('manualProject').value = project;
-      document.getElementById('manualDuration').value = durationMins;
-      document.getElementById('manualSummaryA').value = `**I have** completed ${durationMins} minutes of work on ${project}.`;
-      document.getElementById('manualStepsB').value = `* **I have** worked on ${project}.\n* **I can** verify active progress.`;
-    }
-
-    /* Modal Controls */
-    function openManualModal() {
-      document.getElementById('manualModal').style.display = 'flex';
-      const proj = document.getElementById('manualProject');
-      if (!proj.value) {
-        proj.value = document.getElementById('activeProjectInput').value || 'Timesheet Intelligence';
-      }
-      if (!document.getElementById('manualSummaryA').value) {
-        document.getElementById('manualSummaryA').value = `**I have** completed work on ${proj.value}.`;
-        document.getElementById('manualStepsB').value = `* **I have** implemented core updates for ${proj.value}.\n* **I can** confirm successful validation.`;
-      }
-    }
-
-    function closeManualModal() {
-      document.getElementById('manualModal').style.display = 'none';
-    }
-
-    /* Submit Manual Session via API */
-    function submitManualSession() {
-      const project = document.getElementById('manualProject').value.trim();
-      const duration = document.getElementById('manualDuration').value.trim();
-      const summaryA = document.getElementById('manualSummaryA').value.trim();
-      const stepsB = document.getElementById('manualStepsB').value.trim();
-      const employee = document.getElementById('manualEmployee').value.trim();
-
-      if (!project) {
-        alert('Please enter a project name.');
-        return;
-      }
-
-      const saveBtn = document.getElementById('saveManualBtn');
-      saveBtn.innerText = 'Saving...';
-      saveBtn.setAttribute('disabled', 'true');
-
-      const formData = new FormData();
-      formData.append('project_name', project);
-      formData.append('duration_minutes', duration || 30);
-      formData.append('summary_part_a', summaryA);
-      formData.append('steps_part_b', stepsB);
-      formData.append('employee_name', employee);
-
-      fetch('/api/method/timesheet_intelligence.api.create_manual_session', {
-        method: 'POST',
-        body: formData
-      })
-      .then(r => r.json())
-      .then(res => {
-        saveBtn.innerText = 'Save & Add to Timesheet';
-        saveBtn.removeAttribute('disabled');
-        if (res.message && res.message.status === 'success') {
-          closeManualModal();
-          showToast('Session logged successfully!');
-          setTimeout(() => {
-            window.location.reload();
-          }, 600);
-        } else {
-          alert('Error logging session: ' + (res.message || 'Unknown error'));
-        }
-      })
-      .catch(err => {
-        saveBtn.innerText = 'Save & Add to Timesheet';
-        saveBtn.removeAttribute('disabled');
-        alert('Failed to connect to backend.');
-      });
-    }
-
-    /* Delete Session Log */
+    /* Delete Session */
     function deleteSession(docname) {
-      if (!confirm('Are you sure you want to delete this session entry?')) return;
+      if (!confirm('Are you sure you want to delete this session log?')) return;
 
       const formData = new FormData();
       formData.append('session_name', docname);
@@ -884,13 +1287,8 @@
           if (row) row.remove();
           setTimeout(() => {
             window.location.reload();
-          }, 600);
-        } else {
-          alert('Could not delete session.');
+          }, 500);
         }
-      })
-      .catch(() => {
-        alert('Network error.');
       });
     }
   </script>
