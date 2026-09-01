@@ -3,21 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Timesheet Intelligence | Autonomous Cross-Platform Tracking</title>
+  <title>Timesheet Intelligence | Autonomous & Manual Tracking</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #1A73E8;
-      --primary-dark: #1557B0;
+      --primary: #2563EB;
+      --primary-dark: #1D4ED8;
+      --primary-light: #EFF6FF;
       --surface: #0F172A;
       --card-bg: #FFFFFF;
       --text-main: #0F172A;
       --text-muted: #64748B;
       --border: #E2E8F0;
       --success: #10B981;
+      --danger: #EF4444;
       --purple: #8B5CF6;
+      --amber: #F59E0B;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,17 +39,17 @@
     .ambient-grid {
       position: fixed;
       inset: 0;
-      background-image: radial-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px);
+      background-image: radial-gradient(rgba(148, 163, 184, 0.22) 1px, transparent 1px);
       background-size: 24px 24px;
       pointer-events: none;
       z-index: 0;
     }
 
-    /* Navigation Bar */
+    /* Header */
     header {
       position: sticky;
       top: 0;
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
       z-index: 100;
@@ -54,6 +57,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
 
     .brand {
@@ -65,22 +70,22 @@
     }
 
     .brand-logo-badge {
-      background: linear-gradient(135deg, #1A73E8, #8B5CF6);
+      background: linear-gradient(135deg, #2563EB, #8B5CF6);
       color: #FFFFFF;
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.2rem;
+      font-size: 1.25rem;
       font-weight: 800;
-      box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
     }
 
     .brand-text h1 {
       font-family: 'Outfit', sans-serif;
-      font-size: 1.15rem;
+      font-size: 1.18rem;
       font-weight: 800;
       letter-spacing: -0.02em;
     }
@@ -91,17 +96,39 @@
       font-weight: 600;
     }
 
+    .date-navigator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #F1F5F9;
+      padding: 4px 8px;
+      border-radius: 12px;
+      border: 1px solid #CBD5E1;
+    }
+
+    .date-navigator input[type="date"] {
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--text-main);
+      cursor: pointer;
+      outline: none;
+    }
+
     .nav-actions {
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
 
     .btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 16px;
+      padding: 9px 18px;
       border-radius: 10px;
       font-size: 0.88rem;
       font-weight: 700;
@@ -109,6 +136,7 @@
       transition: all 0.2s ease;
       cursor: pointer;
       border: 1px solid transparent;
+      outline: none;
     }
 
     .btn-outline {
@@ -122,13 +150,33 @@
     }
 
     .btn-primary {
-      background: var(--surface);
+      background: var(--primary);
       color: #FFFFFF;
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
     }
     .btn-primary:hover {
-      background: #1E293B;
+      background: var(--primary-dark);
       transform: translateY(-1px);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #FFFFFF;
+    }
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .btn-danger {
+      background: #FEE2E2;
+      color: #DC2626;
+      border: 1px solid #FECACA;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+    }
+    .btn-danger:hover {
+      background: #DC2626;
+      color: #FFFFFF;
     }
 
     /* Main Container */
@@ -136,10 +184,80 @@
       flex: 1;
       max-width: 1200px;
       width: 100%;
-      margin: 2rem auto;
+      margin: 1.5rem auto;
       padding: 0 1.5rem;
       position: relative;
       z-index: 1;
+    }
+
+    /* Live Timer Widget Card */
+    .timer-card {
+      background: linear-gradient(135deg, #0F172A, #1E293B);
+      color: #FFFFFF;
+      border-radius: 20px;
+      padding: 1.5rem 2rem;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15);
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+    }
+
+    .timer-left {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .timer-display {
+      font-family: 'Outfit', monospace;
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: #38BDF8;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 6px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .timer-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .timer-inputs label {
+      font-size: 0.75rem;
+      color: #94A3B8;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .timer-inputs input {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #FFFFFF;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      outline: none;
+      width: 240px;
+    }
+    .timer-inputs input:focus {
+      border-color: #38BDF8;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .timer-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
     /* Stats Grid */
@@ -164,7 +282,7 @@
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, #1A73E8, #8B5CF6);
+      background: linear-gradient(90deg, #2563EB, #8B5CF6);
     }
 
     .stat-label {
@@ -200,11 +318,13 @@
       border-bottom: 1px solid var(--border);
       padding-bottom: 1.25rem;
       margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
     }
 
     .viewer-title {
       font-family: 'Outfit', sans-serif;
-      font-size: 1.4rem;
+      font-size: 1.35rem;
       font-weight: 800;
     }
 
@@ -212,12 +332,15 @@
       background: #EEF2FF;
       color: #4F46E5;
       border: 1px solid #C7D2FE;
-      padding: 8px 14px;
-      border-radius: 8px;
+      padding: 8px 16px;
+      border-radius: 10px;
       font-weight: 700;
-      font-size: 0.85rem;
+      font-size: 0.88rem;
       cursor: pointer;
       transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .copy-btn:hover {
       background: #4F46E5;
@@ -229,11 +352,11 @@
       border: 1px solid #E2E8F0;
       border-radius: 12px;
       padding: 1.5rem;
-      font-family: monospace;
-      font-size: 0.9rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.92rem;
       white-space: pre-wrap;
       word-break: break-word;
-      line-height: 1.7;
+      line-height: 1.75;
       color: #1E293B;
     }
 
@@ -270,11 +393,11 @@
 
     .tag-project {
       background: #EFF6FF;
-      color: #1E40AF;
+      color: #1D4ED8;
       padding: 4px 10px;
       border-radius: 6px;
       font-weight: 700;
-      font-size: 0.8rem;
+      font-size: 0.82rem;
     }
 
     .badge-auto {
@@ -284,6 +407,109 @@
       border-radius: 6px;
       font-size: 0.75rem;
       font-weight: 700;
+    }
+
+    .badge-manual {
+      background: #FEF3C7;
+      color: #92400E;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* Modal Backdrop & Dialog */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-dialog {
+      background: #FFFFFF;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      animation: modalSlideUp 0.25s ease-out;
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 800;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .modal-body {
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #CBD5E1;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .modal-footer {
+      padding: 1.25rem 1.75rem;
+      background: #F8FAFC;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
     }
 
     footer {
@@ -300,30 +526,60 @@
 <body>
   <div class="ambient-grid"></div>
 
+  <!-- Header -->
   <header>
     <a href="/" class="brand">
       <div class="brand-logo-badge">⏱️</div>
       <div class="brand-text">
         <h1>Timesheet Intelligence</h1>
-        <p>Autonomous Developer Tracking Engine</p>
+        <p>Personal Autonomous & Manual Tracking</p>
       </div>
     </a>
+
+    <!-- Date Navigator -->
+    <div class="date-navigator">
+      <span style="font-size: 0.82rem; font-weight: 700; color: #64748B;">Date:</span>
+      <input type="date" id="dateSelector" value="{{ today_date }}" onchange="navigateDate(this.value)">
+    </div>
+
+    <!-- Actions -->
     <div class="nav-actions">
+      <button class="btn btn-primary" onclick="openManualModal()">➕ Log Manual Session</button>
       <a href="/api/method/timesheet_intelligence.api.get_daily_summary?date={{ today_date }}" target="_blank" class="btn btn-outline">⚡ REST API</a>
-      <a href="/app/antigravity-session-log" class="btn btn-primary">Open Desk App →</a>
+      <a href="/app/antigravity-session-log" class="btn btn-outline">Desk App →</a>
     </div>
   </header>
 
   <main>
-    <!-- Live Stats -->
+    <!-- Live Stopwatch & Quick Tracking Bar -->
+    <div class="timer-card">
+      <div class="timer-left">
+        <div class="timer-display" id="timerDisplay">00:00:00</div>
+        <div class="timer-inputs">
+          <label>Active Project</label>
+          <input type="text" id="activeProjectInput" placeholder="e.g. Timesheet Intelligence" value="Timesheet Intelligence" list="projectSuggestions">
+          <datalist id="projectSuggestions">
+            {% for p in available_projects %}
+            <option value="{{ p }}">
+            {% endfor %}
+          </datalist>
+        </div>
+      </div>
+      <div class="timer-actions">
+        <button id="startTimerBtn" class="btn btn-success" onclick="toggleTimer()">▶ Start Timer</button>
+        <button id="logTimerBtn" class="btn btn-outline" style="color: #FFFFFF; border-color: rgba(255,255,255,0.3);" onclick="finishAndLogTimer()" disabled>⏹ Finish & Log</button>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Today's Total Hours</div>
-        <div class="stat-value">{{ total_hours_display }}</div>
+        <div class="stat-label">Date Total Hours</div>
+        <div class="stat-value" id="statHours">{{ total_hours_display }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Recorded Sessions</div>
-        <div class="stat-value">{{ total_sessions }}</div>
+        <div class="stat-value" id="statSessions">{{ total_sessions }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Active Paired Devices</div>
@@ -339,8 +595,8 @@
     <div class="viewer-card">
       <div class="viewer-header">
         <div>
-          <h2 class="viewer-title">Today's Synthesized Timesheet ({{ today_date }})</h2>
-          <p style="font-size: 0.88rem; color: #64748B;">Auto-generated from recorded developer sessions across all projects.</p>
+          <h2 class="viewer-title">Synthesized Daily Timesheet ({{ today_date }})</h2>
+          <p style="font-size: 0.88rem; color: #64748B;">Auto-generated Executive Part A and Part B formatted report.</p>
         </div>
         <button class="copy-btn" onclick="copyTimesheet()">📋 Copy to Clipboard</button>
       </div>
@@ -355,12 +611,15 @@
 * **[{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}] {{ l.project_name }}** ({{ l.duration_minutes }} mins):
 {{ l.steps_part_b or l.summary_part_a }}
 {% endfor %}
-{% else %}No active sessions recorded yet for today. Start coding or run `python3 agent.py start` to begin auto-tracking!{% endif %}</div>
+{% else %}No active sessions recorded yet for {{ today_date }}. Use the "➕ Log Manual Session" button above or start coding with `python3 agent.py start` to log work!{% endif %}</div>
     </div>
 
     <!-- Recent Session Logs Table -->
     <div class="table-card">
-      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; margin-bottom: 0.5rem;">Recent Session Logs</h3>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+        <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.15rem;">Session Logs ({{ today_date }})</h3>
+        <button class="btn btn-outline" style="font-size: 0.8rem; padding: 5px 12px;" onclick="window.location.reload()">🔄 Refresh</button>
+      </div>
       <table>
         <thead>
           <tr>
@@ -369,22 +628,33 @@
             <th>Time Window</th>
             <th>Duration</th>
             <th>Mode</th>
-            <th>Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="logsTableBody">
           {% for l in logs %}
-          <tr>
+          <tr id="row-{{ l.name }}">
             <td style="font-family: monospace; font-weight: 600;">{{ l.session_id }}</td>
             <td><span class="tag-project">{{ l.project_name }}</span></td>
             <td>{{ l.from_time.strftime('%I:%M %p') }} – {{ l.to_time.strftime('%I:%M %p') }}</td>
             <td style="font-weight: 700;">{{ l.duration_minutes }} mins</td>
-            <td><span class="badge-auto">{{ l.mode or 'Automatic' }}</span></td>
-            <td><a href="/app/antigravity-session-log/{{ l.name }}" style="color: #1A73E8; font-weight: 700; text-decoration: none;">View Log →</a></td>
+            <td>
+              {% if l.mode == 'Manual' %}
+                <span class="badge-manual">Manual ✍️</span>
+              {% else %}
+                <span class="badge-auto">Automatic 🤖</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="/app/antigravity-session-log/{{ l.name }}" style="color: #2563EB; font-weight: 700; text-decoration: none; font-size: 0.85rem;">View</a>
+                <button class="btn-danger" style="border-radius: 6px; cursor: pointer;" onclick="deleteSession('{{ l.name }}')">Delete</button>
+              </div>
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" style="text-align: center; color: #94A3B8; padding: 2rem;">No logs found. Run <code>python3 agent.py log</code> to record a session.</td>
+            <td colspan="6" style="text-align: center; color: #94A3B8; padding: 2.5rem;">No sessions logged for {{ today_date }}. Click <strong>➕ Log Manual Session</strong> to add one!</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -392,33 +662,235 @@
     </div>
   </main>
 
+  <!-- Manual Logging Modal -->
+  <div class="modal-backdrop" id="manualModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>➕ Log Work Session</h3>
+        <button class="modal-close" onclick="closeManualModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Project / Workspace Name *</label>
+          <input type="text" id="manualProject" class="form-control" placeholder="e.g. Timesheet Intelligence" list="projectSuggestions" required>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label>Duration (Minutes) *</label>
+            <input type="number" id="manualDuration" class="form-control" placeholder="30" value="30" min="1" required>
+          </div>
+          <div class="form-group">
+            <label>Employee Profile</label>
+            <input type="text" id="manualEmployee" class="form-control" value="Hardik Sharma">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Part A: Single-Line Summary</label>
+          <input type="text" id="manualSummaryA" class="form-control" placeholder="**I have** completed feature implementation on...">
+        </div>
+        <div class="form-group">
+          <label>Part B: Step-by-Step Points (I have / I had / I can)</label>
+          <textarea id="manualStepsB" class="form-control" rows="4" placeholder="* **I have** implemented...&#10;* **I had** reviewed...&#10;* **I can** verify that..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeManualModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveManualBtn" onclick="submitManualSession()">Save & Add to Timesheet</button>
+      </div>
+    </div>
+  </div>
+
   <footer>
-    Timesheet Intelligence &bull; Personal Autonomous Time Tracking Engine &bull; Hosted on <code>timesheet.local</code>
+    Timesheet Intelligence &bull; Personal Autonomous & Manual Time Tracking Engine &bull; Hosted on <code>timesheet.local</code>
   </footer>
 
-  <div id="toast" style="position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: white; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 0.88rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 9999; display: flex; align-items: center; gap: 8px;">
-    <span>✅</span> <span id="toastMessage">Copied to clipboard!</span>
+  <!-- Toast Notification -->
+  <div id="toast" style="position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: white; padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 0.88rem; box-shadow: 0 10px 25px rgba(0,0,0,0.25); transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 9999; display: flex; align-items: center; gap: 8px;">
+    <span id="toastIcon">✅</span> <span id="toastMessage">Copied to clipboard!</span>
   </div>
 
   <script>
-    function showToast(msg) {
+    /* Date Navigation */
+    function navigateDate(dateStr) {
+      if (dateStr) {
+        window.location.href = '/?date=' + encodeURIComponent(dateStr);
+      }
+    }
+
+    /* Toast Alert */
+    function showToast(msg, icon = '✅') {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMessage');
+      const toastIco = document.getElementById('toastIcon');
       toastMsg.innerText = msg;
+      toastIco.innerText = icon;
       toast.style.transform = 'translateY(0)';
       toast.style.opacity = '1';
       setTimeout(() => {
         toast.style.transform = 'translateY(100px)';
         toast.style.opacity = '0';
-      }, 2500);
+      }, 3000);
     }
 
+    /* Clipboard Copy */
     function copyTimesheet() {
       const text = document.getElementById('timesheetText').innerText;
       navigator.clipboard.writeText(text).then(() => {
         showToast('Timesheet copied to clipboard!');
       }).catch(() => {
-        showToast('Failed to copy');
+        showToast('Failed to copy', '❌');
+      });
+    }
+
+    /* Stopwatch Timer Logic */
+    let timerInterval = null;
+    let timerSeconds = 0;
+    let isTimerRunning = false;
+
+    function formatTimerDisplay(totalSeconds) {
+      const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+      const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+      const s = String(totalSeconds % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
+
+    function toggleTimer() {
+      const btn = document.getElementById('startTimerBtn');
+      const logBtn = document.getElementById('logTimerBtn');
+      if (!isTimerRunning) {
+        isTimerRunning = true;
+        btn.innerText = '⏸ Pause Timer';
+        btn.style.background = '#F59E0B';
+        logBtn.removeAttribute('disabled');
+        logBtn.style.color = '#FFFFFF';
+        timerInterval = setInterval(() => {
+          timerSeconds++;
+          document.getElementById('timerDisplay').innerText = formatTimerDisplay(timerSeconds);
+        }, 1000);
+      } else {
+        isTimerRunning = false;
+        btn.innerText = '▶ Resume Timer';
+        btn.style.background = '#10B981';
+        clearInterval(timerInterval);
+      }
+    }
+
+    function finishAndLogTimer() {
+      if (timerSeconds < 60) {
+        if (!confirm("Timer is less than 1 minute. Log it as 1 minute?")) return;
+      }
+      clearInterval(timerInterval);
+      isTimerRunning = false;
+      const durationMins = Math.max(1, Math.round(timerSeconds / 60));
+      const project = document.getElementById('activeProjectInput').value.trim() || 'Timesheet Intelligence';
+      
+      // Reset Timer UI
+      timerSeconds = 0;
+      document.getElementById('timerDisplay').innerText = '00:00:00';
+      document.getElementById('startTimerBtn').innerText = '▶ Start Timer';
+      document.getElementById('startTimerBtn').style.background = '#10B981';
+      document.getElementById('logTimerBtn').setAttribute('disabled', 'true');
+
+      // Open Modal Pre-filled
+      openManualModal();
+      document.getElementById('manualProject').value = project;
+      document.getElementById('manualDuration').value = durationMins;
+      document.getElementById('manualSummaryA').value = `**I have** completed ${durationMins} minutes of work on ${project}.`;
+      document.getElementById('manualStepsB').value = `* **I have** worked on ${project}.\n* **I can** verify active progress.`;
+    }
+
+    /* Modal Controls */
+    function openManualModal() {
+      document.getElementById('manualModal').style.display = 'flex';
+      const proj = document.getElementById('manualProject');
+      if (!proj.value) {
+        proj.value = document.getElementById('activeProjectInput').value || 'Timesheet Intelligence';
+      }
+      if (!document.getElementById('manualSummaryA').value) {
+        document.getElementById('manualSummaryA').value = `**I have** completed work on ${proj.value}.`;
+        document.getElementById('manualStepsB').value = `* **I have** implemented core updates for ${proj.value}.\n* **I can** confirm successful validation.`;
+      }
+    }
+
+    function closeManualModal() {
+      document.getElementById('manualModal').style.display = 'none';
+    }
+
+    /* Submit Manual Session via API */
+    function submitManualSession() {
+      const project = document.getElementById('manualProject').value.trim();
+      const duration = document.getElementById('manualDuration').value.trim();
+      const summaryA = document.getElementById('manualSummaryA').value.trim();
+      const stepsB = document.getElementById('manualStepsB').value.trim();
+      const employee = document.getElementById('manualEmployee').value.trim();
+
+      if (!project) {
+        alert('Please enter a project name.');
+        return;
+      }
+
+      const saveBtn = document.getElementById('saveManualBtn');
+      saveBtn.innerText = 'Saving...';
+      saveBtn.setAttribute('disabled', 'true');
+
+      const formData = new FormData();
+      formData.append('project_name', project);
+      formData.append('duration_minutes', duration || 30);
+      formData.append('summary_part_a', summaryA);
+      formData.append('steps_part_b', stepsB);
+      formData.append('employee_name', employee);
+
+      fetch('/api/method/timesheet_intelligence.api.create_manual_session', {
+        method: 'POST',
+        body: formData
+      })
+      .then(r => r.json())
+      .then(res => {
+        saveBtn.innerText = 'Save & Add to Timesheet';
+        saveBtn.removeAttribute('disabled');
+        if (res.message && res.message.status === 'success') {
+          closeManualModal();
+          showToast('Session logged successfully!');
+          setTimeout(() => {
+            window.location.reload();
+          }, 600);
+        } else {
+          alert('Error logging session: ' + (res.message || 'Unknown error'));
+        }
+      })
+      .catch(err => {
+        saveBtn.innerText = 'Save & Add to Timesheet';
+        saveBtn.removeAttribute('disabled');
+        alert('Failed to connect to backend.');
+      });
+    }
+
+    /* Delete Session Log */
+    function deleteSession(docname) {
+      if (!confirm('Are you sure you want to delete this session entry?')) return;
+
+      const formData = new FormData();
+      formData.append('session_name', docname);
+
+      fetch('/api/method/timesheet_intelligence.api.delete_session', {
+        method: 'POST',
+        body: formData
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.message && res.message.status === 'success') {
+          showToast('Session deleted!');
+          const row = document.getElementById('row-' + docname);
+          if (row) row.remove();
+          setTimeout(() => {
+            window.location.reload();
+          }, 600);
+        } else {
+          alert('Could not delete session.');
+        }
+      })
+      .catch(() => {
+        alert('Network error.');
       });
     }
   </script>

@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, getdate, get_datetime, format_datetime
+from datetime import timedelta
 import json
 
 @frappe.whitelist(allow_guest=True)
@@ -201,3 +202,67 @@ def switch_user(device_uuid, new_user):
 		"status": "success",
 		"message": _("Device user switched successfully to {0}").format(new_user)
 	}
+
+@frappe.whitelist(allow_guest=True)
+def create_manual_session(project_name, duration_minutes=30, summary_part_a=None, steps_part_b=None, from_time=None, to_time=None, employee_name=None):
+	"""Log a manual time entry directly from the portal or API."""
+	if not project_name:
+		frappe.throw(_("Project name is required"))
+	
+	if not to_time:
+		to_time = now_datetime()
+	if not from_time:
+		from_time = get_datetime(to_time) - timedelta(minutes=float(duration_minutes or 30))
+	else:
+		from_time = get_datetime(from_time)
+		to_time = get_datetime(to_time)
+		diff = (to_time - from_time).total_seconds() / 60.0
+		duration_minutes = max(1.0, round(diff, 1))
+
+	total_hours = round(float(duration_minutes) / 60.0, 2)
+	session_id = f"SES-MANUAL-{frappe.generate_hash(length=8)}"
+	
+	if not summary_part_a:
+		summary_part_a = f"**I have** completed work on {project_name}."
+	if not steps_part_b:
+		steps_part_b = f"* **I have** worked on tasks for {project_name}."
+		
+	doc = frappe.get_doc({
+		"doctype": "Antigravity Session Log",
+		"session_id": session_id,
+		"project_name": project_name,
+		"employee_name": employee_name or "Hardik Sharma",
+		"user": frappe.session.user if frappe.session.user != "Guest" else "Administrator",
+		"mode": "Manual",
+		"status": "Completed",
+		"from_time": from_time,
+		"to_time": to_time,
+		"duration_minutes": float(duration_minutes),
+		"total_hours": total_hours,
+		"summary_part_a": summary_part_a,
+		"steps_part_b": steps_part_b,
+		"git_commits": "[]",
+		"files_touched": "[]",
+		"raw_work_items": "[]"
+	})
+	doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+	
+	return {
+		"status": "success",
+		"message": _("Manual session logged successfully"),
+		"docname": doc.name,
+		"session_id": doc.session_id
+	}
+
+@frappe.whitelist(allow_guest=True)
+def delete_session(session_name):
+	"""Delete a session log by its docname."""
+	if not session_name:
+		frappe.throw(_("Session name is required"))
+	if frappe.db.exists("Antigravity Session Log", session_name):
+		frappe.delete_doc("Antigravity Session Log", session_name, ignore_permissions=True)
+		frappe.db.commit()
+		return {"status": "success", "message": _("Session deleted successfully")}
+	return {"status": "error", "message": _("Session not found")}
+
