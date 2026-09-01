@@ -56,11 +56,10 @@ app_license = "mit"
 # Home Pages
 # ----------
 
-# application home page (will override Website Settings)
-home_page = "index"
+# home_page = "timesheet"
 
 website_route_rules = [
-	{"from_route": "/", "to_route": "index"},
+	{"from_route": "/timesheet", "to_route": "timesheet"},
 ]
 
 # website user home page (by Role)
