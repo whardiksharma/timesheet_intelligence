@@ -59,7 +59,7 @@ app_license = "mit"
 # home_page = "timesheet"
 
 website_route_rules = [
-	{"from_route": "/timesheet", "to_route": "timesheet"},
+	{"from_route": "/timesheet", "to_route": "timesheet_pwa"},
 ]
 
 # website user home page (by Role)
@@ -125,17 +125,9 @@ website_route_rules = [
 
 # notification_config = "timesheet_intelligence.notifications.get_notification_config"
 
-# Permissions
-# -----------
-# Permissions evaluated in scripted ways
-
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Timesheet Log": "timesheet_intelligence.api.get_timesheet_permission_query",
+}
 
 # Document Events
 # ---------------

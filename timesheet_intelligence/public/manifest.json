@@ -1,0 +1,25 @@
+{
+  "name": "Timesheet PWA",
+  "short_name": "Timesheet",
+  "description": "Offline-First Voice and Timer Timesheet Tracker for Frappe",
+  "start_url": "/timesheet",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/assets/timesheet_intelligence/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/timesheet_intelligence/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
