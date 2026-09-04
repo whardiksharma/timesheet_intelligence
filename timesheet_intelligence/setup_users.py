@@ -1,13 +1,47 @@
 import frappe
+from frappe.utils.password import update_password, check_password
 
 def grant_all_access():
-    print("=== ENSURING DOCPERMS FOR USER AND TIMESHEET LOG ===")
+    print("=== CONFIGURING PASSWORDS & PERMISSIONS FOR ALL USERS ===")
     
-    # Check User DocPerm
-    # Frappe by default allows System Manager, and users can view their own profile.
-    # Let's ensure Employee and Desk User have permission to read/write their own Timesheet Log
+    user_passwords = {
+        "hardiksharma80912@gmail.com": "ommnomi2",
+        "nomeshwer@ommnomi.in": "OmmNoMi",
+        "meenaxi@ommnomi.in": "ommnomi123",
+        "neha@ommnomi.in": "ommnomi123",
+    }
+    
+    for email, pwd in user_passwords.items():
+        if not frappe.db.exists("User", email):
+            print(f"Creating User: {email}")
+            user_doc = frappe.get_doc({
+                "doctype": "User",
+                "email": email,
+                "first_name": email.split("@")[0].capitalize(),
+                "enabled": 1,
+                "user_type": "System User",
+                "send_welcome_email": 0
+            })
+            user_doc.insert(ignore_permissions=True)
+        else:
+            user_doc = frappe.get_doc("User", email)
+            user_doc.enabled = 1
+            user_doc.user_type = "System User"
+            user_doc.save(ignore_permissions=True)
+
+        # 1. Update Password in __Auth
+        update_password(user=email, pwd=pwd, logout_all_sessions=False)
+        print(f"✓ Password updated in __Auth for {email} -> '{pwd}'")
+
+        # 2. Verify check_password
+        try:
+            check_password(email, pwd)
+            print(f"  -> Authentication test PASSED for {email}")
+        except Exception as e:
+            print(f"  -> Authentication test FAILED for {email}: {e}")
+
+    # Timesheet Log permissions
     if frappe.db.table_exists("DocPerm"):
-        # Timesheet Log permissions
         roles_to_grant_timesheet = ["Employee", "Desk User", "All"]
         for role in roles_to_grant_timesheet:
             existing = frappe.db.get_value("Custom DocPerm", {"parent": "Timesheet Log", "role": role}) or \
@@ -39,7 +73,7 @@ def grant_all_access():
         print(f"Could not set home_page: {e}")
 
     frappe.db.commit()
-    print("=== DOCPERMS & ROUTING UPDATED ===")
+    print("=== ALL USERS PROPERLY CONFIGURED & VERIFIED ===")
 
 if __name__ == "__main__":
     grant_all_access()

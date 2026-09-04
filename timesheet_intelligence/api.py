@@ -10,7 +10,9 @@ def get_current_employee(user=None):
 	Automatically resolves session user to Employee record with fallback.
 	"""
 	if not user:
-		user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+		if frappe.session.user == "Guest":
+			frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+		user = frappe.session.user
 	
 	full_name = frappe.db.get_value("User", user, "full_name") or user
 	employee_id = user
@@ -41,12 +43,15 @@ def get_current_employee(user=None):
 		"employee_name": employee_name
 	}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_current_user_profile():
 	"""
 	Returns authenticated session user profile and resolved employee details.
 	"""
-	user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
+	user = frappe.session.user
 	emp = get_current_employee(user)
 	roles = frappe.get_roles(user)
 	is_manager = bool("System Manager" in roles or "HR Manager" in roles or "Projects Manager" in roles or user == "Administrator")
@@ -75,12 +80,15 @@ def get_timesheet_permission_query(user=None):
 		return ""
 	return f"(`tabTimesheet Log`.`user` = {frappe.db.escape(user)} OR `tabTimesheet Log`.`owner` = {frappe.db.escape(user)})"
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_offline_bundle():
 	"""
 	Returns complete metadata bundle for 100% offline local caching in PWA IndexedDB.
 	"""
-	user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
+	user = frappe.session.user
 	emp = get_current_employee(user)
 
 	# 1. Projects
@@ -141,7 +149,7 @@ def get_offline_bundle():
 		"activity_types": activity_types
 	}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def sync_offline_queue(queue=None):
 	"""
 	AppSheet-grade idempotent batch ingestion endpoint for offline mutations queued in client IndexedDB.
@@ -151,6 +159,9 @@ def sync_offline_queue(queue=None):
 	3. MariaDB Savepoint Isolation: A single failed row rolls back ONLY its own savepoint, allowing valid rows in the batch to commit cleanly.
 	4. Returns structured per-item results with exact server error reasons for failed items.
 	"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
 	if not queue:
 		return {
 			"status": "success",
@@ -169,7 +180,7 @@ def sync_offline_queue(queue=None):
 	if not isinstance(queue, list):
 		queue = [queue]
 
-	session_user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+	session_user = frappe.session.user
 	emp = get_current_employee(session_user)
 
 	processed_ids = []
@@ -282,12 +293,15 @@ def sync_offline_queue(queue=None):
 		"results": results
 	}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_my_timesheets(year=None, month=None, date=None, limit=100):
 	"""
 	Returns timesheets with monthly aggregation for Google Calendar and date-filtered daily logs.
 	Enforces user data isolation for standard employees.
 	"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
 	if not frappe.db.table_exists("Timesheet Log"):
 		return {
 			"status": "success",
@@ -298,7 +312,7 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 			"logs": []
 		}
 
-	user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+	user = frappe.session.user
 	roles = frappe.get_roles(user)
 	is_manager = bool("System Manager" in roles or "HR Manager" in roles or "Projects Manager" in roles or user == "Administrator")
 
@@ -435,13 +449,16 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 		"logs": logs
 	}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def create_manual_session(project_name, sub_project=None, duration_minutes=30, summary_part_a=None, steps_part_b=None, from_time=None, to_time=None):
 	"""Log a manual time entry bound to authenticated session."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
 	if not project_name:
 		frappe.throw(_("Project name is required"))
 	
-	session_user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+	session_user = frappe.session.user
 	emp = get_current_employee(session_user)
 
 	if not to_time:
@@ -487,9 +504,12 @@ def create_manual_session(project_name, sub_project=None, duration_minutes=30, s
 		"session_id": doc.client_uuid
 	}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def delete_session(session_name):
 	"""Delete a timesheet log by its docname with permission check."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
 	if not session_name:
 		frappe.throw(_("Session name is required"))
 	
@@ -501,20 +521,23 @@ def delete_session(session_name):
 	roles = frappe.get_roles(user)
 	is_manager = bool("System Manager" in roles or "HR Manager" in roles or "Projects Manager" in roles or user == "Administrator")
 	
-	if user != "Guest" and not is_manager and doc.user != user and doc.owner != user:
+	if not is_manager and doc.user != user and doc.owner != user:
 		frappe.throw(_("Permission Denied: You can only delete your own timesheets."))
 
 	frappe.delete_doc("Timesheet Log", session_name, ignore_permissions=True)
 	frappe.db.commit()
 	return {"status": "success", "message": _("Timesheet deleted successfully")}
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_daily_summary(date=None):
 	"""Generate on-demand developer formatted timesheet for any date."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
 	if not date:
 		date = getdate()
 	
-	user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
+	user = frappe.session.user
 	emp = get_current_employee(user)
 
 	filters = {
