@@ -1,23 +1,21 @@
 /**
  * TimesheetApp: Clean, Compact, AppSheet-Grade Unified Sync Controller
  * Implements:
- * 1. AppSheet-Style Unified Sync Indicator Widget (#appsheet-sync-widget)
- * 2. Mobile Navbar Optimization (Hides top "+ Start Work" on mobile viewports)
- * 3. Offline Queue Drawer with Conditional Discard (Discard & Retry ONLY on failed/stuck items)
- * 4. Automatic Session Binding to Logged-in User (frappe.session.user)
- * 5. Cross-Account Data Isolation (Purges local cache on account switch)
- * 6. Strict State Machine: Idle vs Active (Instant Unmount on Finish)
- * 7. Mandatory Accomplishment Validation Guard (Shakes input, blocks empty submissions)
- * 8. Safe Page Refresh Reconstruction (No lost time on reload)
- * 9. Google Calendar-Style Monthly Attendance Overview (< Prev / Next >, KPI Badges, Date Filtering)
- * 10. Daily Breakdown Table with Clickable Row -> Frappe Desk Modal
+ * 1. Global Click & Keydown Event Delegation (100% resilient button interactivity)
+ * 2. AppSheet-Style Unified Sync Indicator Widget (#appsheet-sync-widget)
+ * 3. Mobile Navbar Optimization (Hides top "+ Start Work" on mobile viewports)
+ * 4. Offline Queue Drawer with Conditional Discard (Discard & Retry ONLY on failed/stuck items)
+ * 5. Automatic Session Binding to Logged-in User (frappe.session.user)
+ * 6. Cross-Account Data Isolation (Purges local cache on account switch)
+ * 7. Strict State Machine: Idle vs Active (Instant Unmount on Finish)
+ * 8. Mandatory Accomplishment Validation Guard (Shakes input, blocks empty submissions)
+ * 9. Safe Page Refresh Reconstruction (No lost time on reload)
+ * 10. Google Calendar-Style Monthly Attendance Overview (< Prev / Next >, KPI Badges, Date Filtering)
+ * 11. Daily Breakdown Table with Clickable Row -> Frappe Desk Modal
  * 100% WCAG 2.2 AA Compliant.
  */
 
-document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize Database
-  await window.TimesheetDB.init();
-
+(function () {
   // Application State
   const now = new Date();
   const state = {
@@ -60,6 +58,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
   // Helper: HTML Escape
   function escapeHtml(str) {
     if (!str) return '';
@@ -73,105 +76,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Format Helper: Time String (hh:mm AM/PM)
   function formatTimeOnly(date) {
-    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return '';
+    }
   }
 
   // Format Seconds to HH:MM:SS
   function formatSeconds(totalSec) {
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
+    const sCount = Math.max(0, Math.floor(Number(totalSec) || 0));
+    const h = Math.floor(sCount / 3600);
+    const m = Math.floor((sCount % 3600) / 60);
+    const s = sCount % 60;
     return (
       (h < 10 ? '0' + h : h) + ':' +
       (m < 10 ? '0' + m : m) + ':' +
       (s < 10 ? '0' + s : s)
     );
   }
-
-  const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  // DOM Elements
-  const themeToggleBtn = document.getElementById('theme-toggle-btn');
-  const userProfileBadge = document.getElementById('user-profile-badge');
-  const btnHeaderStart = document.getElementById('btn-header-start');
-  const appsheetSyncWidget = document.getElementById('appsheet-sync-widget');
-
-  const activeSessionCard = document.getElementById('active-session-card');
-  const idleSessionCard = document.getElementById('idle-session-card');
-  const sessionStatusPill = document.getElementById('session-status-pill');
-  const sessionStatusLabel = document.getElementById('session-status-label');
-  const timerDisplay = document.getElementById('timer-display');
-  const timerPauseBtn = document.getElementById('timer-pause-btn');
-  const timerResumeBtn = document.getElementById('timer-resume-btn');
-  const btnFinishAndNext = document.getElementById('btn-finish-and-next');
-  const btnChangeProject = document.getElementById('btn-change-project');
-  const btnStartNewSession = document.getElementById('btn-start-new-session');
-
-  const activeProjectLabel = document.getElementById('active-project-label');
-  const activeTaskLabel = document.getElementById('active-task-label');
-  const activeActivityLabel = document.getElementById('active-activity-label');
-  const activeStartTimeLabel = document.getElementById('active-start-time-label');
-
-  const setupModal = document.getElementById('project-setup-modal');
-  const setupModalClose = document.getElementById('setup-modal-close');
-  const setupModalTitle = document.getElementById('setup-modal-title');
-  const btnStartSessionModal = document.getElementById('btn-start-session-modal');
-
-  const projectSelect = document.getElementById('input-project');
-  const taskSelect = document.getElementById('input-task');
-  const activitySelect = document.getElementById('input-activity');
-  const billableCheck = document.getElementById('input-billable');
-
-  const voiceMicBtn = document.getElementById('voice-mic-btn');
-  const voiceBtnLabel = document.getElementById('voice-btn-label');
-  const manualPointInput = document.getElementById('manual-point-input');
-  const btnAddManualPoint = document.getElementById('btn-add-manual-point');
-  const livePointsTableBody = document.getElementById('live-points-table-body');
-  const pointsCounter = document.getElementById('points-counter');
-
-  // Calendar DOM Elements
-  const calPrevBtn = document.getElementById('cal-prev-btn');
-  const calNextBtn = document.getElementById('cal-next-btn');
-  const calTodayBtn = document.getElementById('cal-today-btn');
-  const calMonthTitle = document.getElementById('cal-month-title');
-  const kpiTodayHours = document.getElementById('kpi-today-hours');
-  const kpiMonthHours = document.getElementById('kpi-month-hours');
-  const calendarDaysGrid = document.getElementById('calendar-days-grid');
-
-  // Daily Table DOM Elements
-  const dailyTableTitle = document.getElementById('daily-table-title');
-  const dailyTableBody = document.getElementById('daily-table-body');
-  const todayTotalHoursEl = document.getElementById('today-total-hours');
-  const copyDayReportBtn = document.getElementById('copy-day-report-btn');
-
-  // Details Modal Elements
-  const detailModal = document.getElementById('timesheet-detail-modal');
-  const detailModalClose = document.getElementById('detail-modal-close');
-  const detailCloseBtn = document.getElementById('detail-close-btn');
-  const detailCopyBtn = document.getElementById('detail-copy-btn');
-  const detailDeskLink = document.getElementById('detail-desk-link');
-  const detailProject = document.getElementById('detail-project');
-  const detailTask = document.getElementById('detail-task');
-  const detailActivity = document.getElementById('detail-activity');
-  const detailDuration = document.getElementById('detail-duration');
-  const detailBilling = document.getElementById('detail-billing');
-  const detailAssociate = document.getElementById('detail-associate');
-  const detailFrom = document.getElementById('detail-from');
-  const detailTo = document.getElementById('detail-to');
-  const detailNotes = document.getElementById('detail-notes');
-  const detailStatusPill = document.getElementById('detail-status-pill');
-
-  // AppSheet Sync Queue Modal Elements
-  const syncQueueModal = document.getElementById('sync-queue-modal');
-  const syncQueueModalClose = document.getElementById('sync-queue-modal-close');
-  const syncModalStatusBadge = document.getElementById('sync-modal-status-badge');
-  const syncQueueListContainer = document.getElementById('sync-queue-list-container');
-  const syncModalFooterCount = document.getElementById('sync-modal-footer-count');
-  const btnForceSyncNow = document.getElementById('btn-force-sync-now');
-  const btnCloseSyncModal = document.getElementById('btn-close-sync-modal');
 
   // Toast Helper
   function showToast(message, type = 'info') {
@@ -202,12 +125,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           const cachedUser = localStorage.getItem('timesheet_logged_user');
           if (cachedUser && cachedUser !== profile.user) {
             console.warn(`Account switch detected (${cachedUser} -> ${profile.user}). Purging local cache.`);
-            await window.TimesheetDB.clearAllUserData();
+            if (window.TimesheetDB && window.TimesheetDB.clearAllUserData) {
+              await window.TimesheetDB.clearAllUserData();
+            }
             localStorage.removeItem('timesheet_active_session');
           }
           localStorage.setItem('timesheet_logged_user', profile.user);
 
           // Update Top Bar User Badge
+          const userProfileBadge = document.getElementById('user-profile-badge');
           if (userProfileBadge) {
             userProfileBadge.textContent = `👤 ${profile.full_name || profile.user}`;
             userProfileBadge.title = `Logged in as ${profile.user} (${profile.employee_name || 'Standard Employee'})`;
@@ -226,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function applyTheme(theme) {
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
       if (themeToggleBtn) themeToggleBtn.textContent = '☀️ Light';
@@ -236,23 +163,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('timesheet_theme', theme);
   }
 
-  if (themeToggleBtn) {
-    themeToggleBtn.addEventListener('click', () => {
-      const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-      applyTheme(current === 'light' ? 'dark' : 'light');
-    });
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    applyTheme(current === 'light' ? 'dark' : 'light');
   }
 
   // 3. Setup Modal Controls (Start / Switch)
   function openSetupModal(mode = 'new') {
     state.modalMode = mode;
+    const setupModal = document.getElementById('project-setup-modal');
+    const setupModalTitle = document.getElementById('setup-modal-title');
+    const btnStartSessionModal = document.getElementById('btn-start-session-modal');
+    const projectSelect = document.getElementById('input-project');
+
     if (setupModal) {
       if (mode === 'switch') {
-        setupModalTitle.textContent = 'Switch to Another Project';
-        btnStartSessionModal.textContent = '🔄 Log Current & Switch Project';
+        if (setupModalTitle) setupModalTitle.textContent = 'Switch to Another Project';
+        if (btnStartSessionModal) btnStartSessionModal.textContent = '🔄 Log Current & Switch Project';
       } else {
-        setupModalTitle.textContent = 'What are you working on?';
-        btnStartSessionModal.textContent = '🚀 Start Work Session';
+        if (setupModalTitle) setupModalTitle.textContent = 'What are you working on?';
+        if (btnStartSessionModal) btnStartSessionModal.textContent = '🚀 Start Work Session';
       }
       setupModal.classList.add('open');
       setupModal.style.display = 'flex';
@@ -262,6 +192,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function closeSetupModal() {
+    const setupModal = document.getElementById('project-setup-modal');
     if (setupModal) {
       setupModal.classList.remove('open');
       setupModal.style.display = 'none';
@@ -269,13 +200,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  if (setupModalClose) setupModalClose.addEventListener('click', closeSetupModal);
-  if (btnHeaderStart) btnHeaderStart.addEventListener('click', () => openSetupModal('new'));
-  if (btnStartNewSession) btnStartNewSession.addEventListener('click', () => openSetupModal('new'));
-  if (btnChangeProject) btnChangeProject.addEventListener('click', () => openSetupModal('switch'));
-
   // 4. Start or Switch Working Session
   async function handleModalSubmit() {
+    const projectSelect = document.getElementById('input-project');
+    const taskSelect = document.getElementById('input-task');
+    const activitySelect = document.getElementById('input-activity');
+    const billableCheck = document.getElementById('input-billable');
+
     let projName = 'General Operations';
     let projId = 'PROJ-GENERAL';
 
@@ -309,6 +240,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // Update UI Elements
+    const activeProjectLabel = document.getElementById('active-project-label');
+    const activeTaskLabel = document.getElementById('active-task-label');
+    const activeActivityLabel = document.getElementById('active-activity-label');
+    const activeStartTimeLabel = document.getElementById('active-start-time-label');
+    const idleSessionCard = document.getElementById('idle-session-card');
+    const activeSessionCard = document.getElementById('active-session-card');
+
     if (activeProjectLabel) activeProjectLabel.textContent = projName;
     if (activeTaskLabel) activeTaskLabel.textContent = taskName || 'General Task';
     if (activeActivityLabel) activeActivityLabel.textContent = actName;
@@ -333,23 +271,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(`🚀 Started: ${projName}`, 'success');
   }
 
-  if (btnStartSessionModal) {
-    btnStartSessionModal.addEventListener('click', handleModalSubmit);
-  }
-
   // 5. Timer Logic with Safe Page Refresh Reconstruction
   function saveSessionState() {
-    localStorage.setItem('timesheet_active_session', JSON.stringify({
-      currentSession: state.currentSession,
-      timer: {
-        isRunning: state.timer.isRunning,
-        startTime: state.timer.startTime,
-        elapsedSeconds: state.timer.elapsedSeconds
-      }
-    }));
+    try {
+      localStorage.setItem('timesheet_active_session', JSON.stringify({
+        currentSession: state.currentSession,
+        timer: {
+          isRunning: state.timer.isRunning,
+          startTime: state.timer.startTime,
+          elapsedSeconds: state.timer.elapsedSeconds
+        }
+      }));
+    } catch (e) {}
   }
 
   function restoreSessionState() {
+    const activeProjectLabel = document.getElementById('active-project-label');
+    const activeTaskLabel = document.getElementById('active-task-label');
+    const activeActivityLabel = document.getElementById('active-activity-label');
+    const activeStartTimeLabel = document.getElementById('active-start-time-label');
+    const idleSessionCard = document.getElementById('idle-session-card');
+    const activeSessionCard = document.getElementById('active-session-card');
+    const timerDisplay = document.getElementById('timer-display');
+
     const saved = localStorage.getItem('timesheet_active_session');
     if (saved) {
       try {
@@ -395,12 +339,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function setTimerVisualState(status) {
+    const timerPauseBtn = document.getElementById('timer-pause-btn');
+    const timerResumeBtn = document.getElementById('timer-resume-btn');
+    const sessionStatusPill = document.getElementById('session-status-pill');
+    const sessionStatusLabel = document.getElementById('session-status-label');
+    const timerDisplay = document.getElementById('timer-display');
+
     if (status === 'running') {
       if (timerPauseBtn) timerPauseBtn.style.display = 'inline-flex';
       if (timerResumeBtn) timerResumeBtn.style.display = 'none';
       if (sessionStatusPill) {
         sessionStatusPill.className = 'session-status-badge running';
-        sessionStatusLabel.textContent = 'LIVE RECORDING';
+        if (sessionStatusLabel) sessionStatusLabel.textContent = 'LIVE RECORDING';
       }
       if (timerDisplay) {
         timerDisplay.style.color = 'var(--accent-cyan)';
@@ -410,7 +360,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (timerResumeBtn) timerResumeBtn.style.display = 'inline-flex';
       if (sessionStatusPill) {
         sessionStatusPill.className = 'session-status-badge paused';
-        sessionStatusLabel.textContent = 'PAUSED';
+        if (sessionStatusLabel) sessionStatusLabel.textContent = 'PAUSED';
       }
       if (timerDisplay) {
         timerDisplay.style.color = 'var(--text-muted)';
@@ -420,6 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function startTimerLoop() {
     if (state.timer.interval) clearInterval(state.timer.interval);
+    const timerDisplay = document.getElementById('timer-display');
     state.timer.interval = setInterval(() => {
       state.timer.elapsedSeconds++;
       if (timerDisplay) timerDisplay.textContent = formatSeconds(state.timer.elapsedSeconds);
@@ -451,12 +402,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (state.timer.isRunning) pauseTimer();
     state.timer.elapsedSeconds = 0;
     state.timer.startTime = null;
+    const timerDisplay = document.getElementById('timer-display');
     if (timerDisplay) timerDisplay.textContent = '00:00:00';
     saveSessionState();
   }
-
-  if (timerPauseBtn) timerPauseBtn.addEventListener('click', pauseTimer);
-  if (timerResumeBtn) timerResumeBtn.addEventListener('click', startTimer);
 
   // 6. Work Accomplishments Manager
   function addPoint(text) {
@@ -482,6 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderLivePoints() {
     const tableBody = document.getElementById('live-points-table-body');
+    const pointsCounter = document.getElementById('points-counter');
     if (!tableBody) return;
     tableBody.innerHTML = '';
 
@@ -520,71 +470,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // EVENT DELEGATION: Accomplishments Table Body (Delete point & Expand text)
-  if (livePointsTableBody) {
-    livePointsTableBody.addEventListener('click', (e) => {
-      const delBtn = e.target.closest('.btn-del-point');
-      if (delBtn) {
-        e.stopPropagation();
-        const id = delBtn.getAttribute('data-id');
-        state.currentSession.points = state.currentSession.points.filter((p) => p.id !== id);
-        renderLivePoints();
-        saveSessionState();
-        showToast('Point removed', 'info');
-        return;
-      }
-
-      const textCell = e.target.closest('.point-text-cell');
-      if (textCell) {
-        textCell.classList.toggle('expanded');
-      }
-    });
-  }
-
-  if (btnAddManualPoint && manualPointInput) {
-    btnAddManualPoint.addEventListener('click', () => {
-      addPoint(manualPointInput.value);
-      manualPointInput.value = '';
-    });
-
-    manualPointInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || ((e.ctrlKey || e.metaKey) && e.key === 'Enter')) {
-        e.preventDefault();
-        addPoint(manualPointInput.value);
-        manualPointInput.value = '';
-      }
-    });
-  }
-
-  // Voice Recording
-  if (voiceMicBtn) {
-    let spokenBuffer = '';
-
-    window.TimesheetVoice.onStateChange((isListening) => {
-      if (isListening) {
-        spokenBuffer = '';
-        voiceMicBtn.classList.add('recording');
-        if (voiceBtnLabel) voiceBtnLabel.textContent = 'Recording Voice... Tap to Stop & Add Point';
-      } else {
-        voiceMicBtn.classList.remove('recording');
-        if (voiceBtnLabel) voiceBtnLabel.textContent = 'Tap to Speak (Voice Note)';
-
-        if (spokenBuffer.trim()) {
-          addPoint(spokenBuffer.trim());
-          spokenBuffer = '';
-        }
-      }
-    });
-
-    window.TimesheetVoice.appendTranscript = (text) => {
-      spokenBuffer += (spokenBuffer ? ' ' : '') + text;
-    };
-
-    voiceMicBtn.addEventListener('click', () => {
-      window.TimesheetVoice.toggle();
-    });
-  }
-
   // 7. Save Current Session: Bind Logged-in User Profile Automatically
   async function saveCurrentSessionToLog(customDefaultDesc = '') {
     const now = new Date();
@@ -599,20 +484,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       description = customDefaultDesc || `Completed work on ${state.currentSession.project || 'General Operations'}`;
     }
 
-    const logItem = {
+    const payload = {
       client_uuid: 'uuid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
-      project: state.currentSession.projectId || 'PROJ-GENERAL',
-      project_name: state.currentSession.project || 'General Operations',
-      task: state.currentSession.task,
-      task_name: state.currentSession.task,
-      activity_type: state.currentSession.activity || 'Development',
-      employee_id: state.currentUserProfile.employee_id || state.currentUserProfile.user || 'Administrator',
-      employee_name: state.currentUserProfile.employee_name || state.currentUserProfile.full_name || 'Administrator',
       user: state.currentUserProfile.user || 'Administrator',
+      employee: state.currentUserProfile.employee_id || state.currentUserProfile.employee_name || 'Administrator',
+      employee_name: state.currentUserProfile.employee_name || state.currentUserProfile.full_name || 'Administrator',
+      project: state.currentSession.projectId || state.currentSession.project,
+      project_name: state.currentSession.project,
+      task: state.currentSession.task,
+      activity_type: state.currentSession.activity,
+      is_billable: state.currentSession.isBillable ? 1 : 0,
       from_time: fromTime,
       to_time: toTime,
       duration_minutes: durationMinutes,
-      is_billable: state.currentSession.isBillable ? 1 : 0,
+      accomplishments: description,
       description: description,
       timestamp: now.toISOString(),
       sync_status: 'pending',
@@ -620,41 +505,53 @@ document.addEventListener('DOMContentLoaded', async () => {
       retry_count: 0
     };
 
-    // Save to Local DB
-    await window.TimesheetDB.addToQueue(logItem);
-
-    if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
-      window.TimesheetVoice.playTone('save');
+    // 1. Add to Offline Mutation Queue in IndexedDB
+    if (window.TimesheetDB && window.TimesheetDB.addToQueue) {
+      await window.TimesheetDB.addToQueue(payload);
     }
 
-    // Drain queue in background to sync to Frappe
-    await window.TimesheetSync.updateSyncBadgeUI();
-    window.TimesheetSync.drainQueue();
-    return logItem;
+    // 2. Trigger Unified Sync Engine
+    if (window.TimesheetSync && window.TimesheetSync.drainQueue) {
+      window.TimesheetSync.drainQueue();
+    }
   }
 
-  // 8. Finish Session: MANDATORY ACCOMPLISHMENT GUARD -> UNMOUNT & HIDE ACTIVE CARD
+  // 8. Finish Working Session & Instant Unmount (Client-Side Accomplishment Guard)
   async function finishSessionAndUnmount() {
-    // 1. MANDATORY ACCOMPLISHMENT VALIDATION
-    if (!state.currentSession.points || state.currentSession.points.length === 0) {
-      showToast('⚠️ Please add at least one work accomplishment point before finishing.', 'warning');
+    const manualPointInput = document.getElementById('manual-point-input');
+    const idleSessionCard = document.getElementById('idle-session-card');
+    const activeSessionCard = document.getElementById('active-session-card');
+
+    // Auto-capture unsaved draft in input box
+    if (manualPointInput && manualPointInput.value.trim()) {
+      addPoint(manualPointInput.value.trim());
+      manualPointInput.value = '';
+    }
+
+    // MANDATORY ACCOMPLISHMENT VALIDATION GUARD:
+    const pointsCount = (state.currentSession.points || []).length;
+    if (pointsCount === 0) {
+      showToast('⚠️ Please log at least 1 work accomplishment before finishing!', 'error');
+
       if (manualPointInput) {
-        manualPointInput.classList.add('input-error-shake');
+        manualPointInput.classList.remove('input-shake');
+        void manualPointInput.offsetWidth; // Force reflow
+        manualPointInput.classList.add('input-shake');
         manualPointInput.focus();
-        setTimeout(() => manualPointInput.classList.remove('input-error-shake'), 600);
+      }
+
+      if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
+        window.TimesheetVoice.playTone('error');
       }
       return;
     }
 
-    if (state.timer.isRunning) pauseTimer();
+    pauseTimer();
+    const projName = state.currentSession.project;
 
-    const durationMinutes = Math.max(1, Math.round(state.timer.elapsedSeconds / 60));
     await saveCurrentSessionToLog();
 
-    showToast(`✓ Completed & saved ${durationMinutes} mins!`, 'success');
-
-    // Reset session and timer
-    resetTimer();
+    // Reset session in state
     state.currentSession = {
       project: '',
       projectId: '',
@@ -664,346 +561,239 @@ document.addEventListener('DOMContentLoaded', async () => {
       startTime: null,
       points: []
     };
-    renderLivePoints();
+    resetTimer();
     localStorage.removeItem('timesheet_active_session');
 
-    // UNMOUNT ACTIVE CARD & REVERT TO IDLE CARD
+    // Instant Unmount to Idle Card
     if (activeSessionCard) activeSessionCard.style.display = 'none';
     if (idleSessionCard) idleSessionCard.style.display = 'flex';
+    renderLivePoints();
 
-    // Refresh Calendar & Table
+    if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
+      window.TimesheetVoice.playTone('finish');
+    }
+    showToast(`✓ Logged & saved session: ${projName}`, 'success');
+
     await refreshCalendarAndTable();
   }
 
-  if (btnFinishAndNext) {
-    btnFinishAndNext.addEventListener('click', finishSessionAndUnmount);
-  }
-
-  // 9. Google Calendar Engine (Monthly Attendance Overview)
-  async function refreshCalendarAndTable() {
-    const { currentYear, currentMonth, selectedDate } = state.calendar;
-
-    try {
-      const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?year=${currentYear}&month=${currentMonth}&date=${selectedDate}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        const res = data.message || {};
-        state.calendar.dailySummary = res.daily_summary || {};
-        state.calendar.monthTotalHours = res.month_total_hours || 0.0;
-        state.calendar.todayTotalHours = res.today_total_hours || 0.0;
-
-        renderCalendarGrid();
-        renderDailyTable(res.logs || []);
-        return;
-      }
-    } catch (e) {
-      console.warn('Failed to load online timesheets:', e);
-    }
-
-    // Fallback: render from local cache
-    renderCalendarGrid();
-    const cached = await window.TimesheetDB.getCachedTimesheets();
-    renderDailyTable(cached);
-  }
-
+  // 9. Calendar Navigation Engine
   function renderCalendarGrid() {
-    const { currentYear, currentMonth, selectedDate, dailySummary, monthTotalHours, todayTotalHours } = state.calendar;
+    const calMonthTitle = document.getElementById('cal-month-title');
+    const calendarDaysGrid = document.getElementById('calendar-days-grid');
+    if (!calMonthTitle || !calendarDaysGrid) return;
 
-    // Update Header
-    if (calMonthTitle) {
-      calMonthTitle.textContent = `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
-    }
-    if (kpiTodayHours) {
-      kpiTodayHours.textContent = `${todayTotalHours.toFixed(1)} hrs`;
-    }
-    if (kpiMonthHours) {
-      kpiMonthHours.textContent = `${monthTotalHours.toFixed(1)} hrs`;
-    }
+    const { currentYear, currentMonth, selectedDate, dailySummary } = state.calendar;
+    calMonthTitle.textContent = `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
 
-    if (!calendarDaysGrid) return;
     calendarDaysGrid.innerHTML = '';
 
-    const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay();
-    const adjustedFirstDay = (firstDayIndex + 6) % 7;
+    const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0 (Sun) - 6 (Sat)
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const prevMonthDays = new Date(currentYear, currentMonth - 1, 0).getDate();
+
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // 1. Previous Month Padding Days
-    const prevMonthDays = new Date(currentYear, currentMonth - 1, 0).getDate();
-    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
-      const dayNum = prevMonthDays - i;
+    // Prev month padding
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const dNum = prevMonthDays - i;
       const cell = document.createElement('div');
-      cell.className = 'cal-cell other-month';
-      cell.innerHTML = `<div class="cal-cell-top"><span class="cal-date-num">${dayNum}</span></div>`;
+      cell.className = 'cal-cell is-other-month';
+      cell.innerHTML = `<span class="cal-day-num">${dNum}</span>`;
       calendarDaysGrid.appendChild(cell);
     }
 
-    // 2. Current Month Days
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayOfWeek = new Date(currentYear, currentMonth - 1, day).getDay();
-      const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-      const isToday = (dateStr === todayStr);
-      const isSelected = (dateStr === selectedDate);
-
-      const hours = dailySummary[dateStr] || 0.0;
-      const isPresent = hours >= 4.0;
-      const isPartial = hours > 0 && hours < 4.0;
+    // Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const hours = dailySummary[dateStr] || 0;
+      const isSelected = dateStr === selectedDate;
+      const isToday = dateStr === todayStr;
 
       const cell = document.createElement('div');
-      cell.className = `cal-cell ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`;
+      cell.className = `cal-cell${isSelected ? ' is-selected' : ''}${isToday ? ' is-today' : ''}`;
       cell.setAttribute('data-date', dateStr);
-      cell.setAttribute('role', 'button');
       cell.setAttribute('tabindex', '0');
-      cell.setAttribute('aria-label', `${MONTH_NAMES[currentMonth - 1]} ${day}, ${currentYear}: ${hours.toFixed(1)} hours logged`);
+      cell.setAttribute('role', 'button');
+      cell.setAttribute('aria-label', `${dateStr}: ${hours.toFixed(1)} hours logged`);
 
       let badgeHtml = '';
       if (hours > 0) {
-        badgeHtml = `<span class="cal-hours-badge ${isPresent ? 'present' : 'partial'}">${hours.toFixed(1)}h</span>`;
-      }
-
-      let dotHtml = '';
-      if (isPresent) {
-        dotHtml = '<span class="cal-indicator-dot present" title="Present (≥ 4h)"></span>';
-      } else if (isPartial) {
-        dotHtml = '<span class="cal-indicator-dot partial" title="Partial (< 4h)"></span>';
+        badgeHtml = `<span class="cal-badge-hours">${hours.toFixed(1)}h</span>`;
       }
 
       cell.innerHTML = `
-        <div class="cal-cell-top">
-          <span class="cal-date-num">${day}</span>
-          ${dotHtml}
-        </div>
+        <span class="cal-day-num">${d}</span>
         ${badgeHtml}
       `;
-
       calendarDaysGrid.appendChild(cell);
     }
   }
 
-  // EVENT DELEGATION: Calendar Days Grid (Click date -> filter table)
-  if (calendarDaysGrid) {
-    calendarDaysGrid.addEventListener('click', (e) => {
-      const cell = e.target.closest('.cal-cell[data-date]');
-      if (cell && !cell.classList.contains('other-month')) {
-        const dateStr = cell.getAttribute('data-date');
-        if (dateStr) {
-          state.calendar.selectedDate = dateStr;
-          renderCalendarGrid();
-          filterTableByDate(dateStr);
-        }
-      }
-    });
-
-    calendarDaysGrid.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        const cell = e.target.closest('.cal-cell[data-date]');
-        if (cell && !cell.classList.contains('other-month')) {
-          e.preventDefault();
-          const dateStr = cell.getAttribute('data-date');
-          if (dateStr) {
-            state.calendar.selectedDate = dateStr;
-            renderCalendarGrid();
-            filterTableByDate(dateStr);
-          }
-        }
-      }
-    });
-  }
-
-  // Month Navigation Listeners
-  if (calPrevBtn) {
-    calPrevBtn.addEventListener('click', () => {
-      state.calendar.currentMonth--;
-      if (state.calendar.currentMonth < 1) {
-        state.calendar.currentMonth = 12;
-        state.calendar.currentYear--;
-      }
-      refreshCalendarAndTable();
-    });
-  }
-
-  if (calNextBtn) {
-    calNextBtn.addEventListener('click', () => {
-      state.calendar.currentMonth++;
-      if (state.calendar.currentMonth > 12) {
-        state.calendar.currentMonth = 1;
-        state.calendar.currentYear++;
-      }
-      refreshCalendarAndTable();
-    });
-  }
-
-  if (calTodayBtn) {
-    calTodayBtn.addEventListener('click', () => {
-      const today = new Date();
-      state.calendar.currentYear = today.getFullYear();
-      state.calendar.currentMonth = today.getMonth() + 1;
-      state.calendar.selectedDate = today.toISOString().slice(0, 10);
-      refreshCalendarAndTable();
-    });
-  }
-
-  // 10. Daily Breakdown Table Controller
-  async function filterTableByDate(targetDate) {
-    try {
-      const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?date=${targetDate}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        const logs = (data.message && data.message.logs) || [];
-        renderDailyTable(logs, targetDate);
-        return;
-      }
-    } catch (e) {
-      console.warn('Failed to fetch logs for date:', e);
-    }
-
-    const cached = await window.TimesheetDB.getCachedTimesheets();
-    const filteredCached = cached.filter((c) => (c.from_time || '').slice(0, 10) === targetDate);
-    renderDailyTable(filteredCached, targetDate);
-  }
-
-  async function renderDailyTable(logs, activeDate = state.calendar.selectedDate) {
+  // 10. Daily Timesheets Breakdown Table
+  function renderDailyBreakdownTable(logsForDate) {
+    const dailyTableTitle = document.getElementById('daily-table-title');
+    const dailyTableBody = document.getElementById('daily-table-body');
+    const todayTotalHoursEl = document.getElementById('today-total-hours');
     if (!dailyTableBody) return;
     dailyTableBody.innerHTML = '';
 
-    const queue = await window.TimesheetDB.getQueue();
-    const filteredQueue = queue.filter((q) => (q.from_time || '').slice(0, 10) === activeDate);
-
-    // Update Title
-    const formattedDate = new Date(activeDate + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    const targetDate = state.calendar.selectedDate;
     if (dailyTableTitle) {
-      dailyTableTitle.textContent = `Timesheets for ${formattedDate}`;
+      dailyTableTitle.textContent = `Activities for ${targetDate}`;
     }
 
-    let totalFilteredMins = 0;
-    const combined = [
-      ...filteredQueue.map((q) => ({ ...q, is_queued: true })),
-      ...logs.map((l) => ({ ...l, is_queued: false }))
-    ];
+    let dayTotalMinutes = 0;
 
-    if (combined.length === 0) {
+    if (!logsForDate || logsForDate.length === 0) {
       dailyTableBody.innerHTML = `
         <tr>
-          <td colspan="6" style="text-align: center; padding: 28px; color: var(--text-dim); font-size: 0.9rem;">
-            No timesheets recorded for ${formattedDate}. Tap "Start Work" above to begin!
+          <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-dim);">
+            No timesheet logs found for ${targetDate}.
           </td>
         </tr>
       `;
-      if (todayTotalHoursEl) todayTotalHoursEl.textContent = '0.00 hrs';
+      if (todayTotalHoursEl) todayTotalHoursEl.textContent = '0.0h';
       return;
     }
 
-    combined.forEach((item) => {
-      const mins = Number(item.duration_minutes || (item.total_hours ? item.total_hours * 60 : 0));
-      totalFilteredMins += mins;
+    logsForDate.forEach((log) => {
+      const mins = Number(log.duration_minutes || 0);
+      dayTotalMinutes += mins;
 
-      const fromStr = item.from_time ? formatTimeOnly(item.from_time) : '--';
-      const toStr = item.to_time ? formatTimeOnly(item.to_time) : '--';
+      const timeRange = `${formatTimeOnly(log.from_time)} - ${formatTimeOnly(log.to_time)}`;
+      const proj = log.project_name || log.project || 'General Operations';
+      const task = log.task ? ` • ${log.task}` : '';
+      const act = log.activity_type || 'Development';
+      const pointsList = log.accomplishments || log.description || log.steps_part_b || '';
 
       const tr = document.createElement('tr');
-      tr.setAttribute('data-log-json', JSON.stringify(item));
+      tr.className = 'daily-log-row';
+      tr.setAttribute('data-log-json', JSON.stringify(log));
       tr.setAttribute('tabindex', '0');
       tr.setAttribute('role', 'button');
-      tr.setAttribute('aria-label', `View details for ${item.project_name || item.project || 'General Operations'}, ${mins} minutes`);
+      tr.setAttribute('aria-label', `View details for ${proj}`);
+
       tr.innerHTML = `
-        <td>
-          <div class="table-project-cell">
-            <span style="color:var(--accent-cyan);">⚡</span>
-            <span>${escapeHtml(item.project_name || item.project || 'General Operations')}</span>
+        <td style="width: 25%;">
+          <span class="meta-pill pill-time" style="font-size: 0.74rem;">${timeRange}</span>
+        </td>
+        <td style="width: 35%;">
+          <div style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">${escapeHtml(proj)}</div>
+          <div style="font-size: 0.76rem; color: var(--text-muted);">${escapeHtml(act)}${escapeHtml(task)}</div>
+        </td>
+        <td style="width: 25%;">
+          <div style="font-size: 0.8rem; color: var(--text-dim); max-height: 38px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${escapeHtml(pointsList.replace(/\n/g, ' | '))}
           </div>
         </td>
-        <td>
-          <div class="table-task-cell">
-            ${item.task_name || item.task ? `<strong>${escapeHtml(item.task_name || item.task)}</strong> • ` : ''}
-            <span>${escapeHtml(item.activity_type || 'Development')}</span>
-          </div>
-        </td>
-        <td class="table-time-cell">${fromStr}</td>
-        <td class="table-time-cell">${toStr}</td>
-        <td class="table-duration-cell">${mins}m (${(mins/60).toFixed(2)}h)</td>
-        <td>
-          <span class="sync-pill ${item.is_queued ? 'offline' : ''}">
-            ${item.is_queued ? (item.sync_status === 'failed' ? '⚠️ Failed' : 'Queued Offline') : 'Synced'}
-          </span>
+        <td style="width: 15%; text-align: right; font-weight: 800; color: var(--accent-cyan);">
+          ${(mins / 60).toFixed(1)}h
         </td>
       `;
       dailyTableBody.appendChild(tr);
     });
 
     if (todayTotalHoursEl) {
-      todayTotalHoursEl.textContent = `${(totalFilteredMins / 60).toFixed(2)} hrs`;
+      todayTotalHoursEl.textContent = `${(dayTotalMinutes / 60).toFixed(1)}h`;
     }
   }
 
-  // EVENT DELEGATION: Daily Breakdown Table Row Click
-  if (dailyTableBody) {
-    dailyTableBody.addEventListener('click', (e) => {
-      const tr = e.target.closest('tr[data-log-json]');
-      if (tr) {
-        const raw = tr.getAttribute('data-log-json');
-        if (raw) {
-          try {
-            const data = JSON.parse(raw);
-            openDetailModal(data);
-          } catch (err) {
-            console.error('Error parsing row JSON:', err);
-          }
-        }
-      }
-    });
+  async function refreshCalendarAndTable() {
+    try {
+      const allLogs = window.TimesheetSync ? await window.TimesheetSync.fetchLatestTimesheets() : [];
+      const { currentYear, currentMonth, selectedDate } = state.calendar;
 
-    dailyTableBody.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        const tr = e.target.closest('tr[data-log-json]');
-        if (tr) {
-          e.preventDefault();
-          const raw = tr.getAttribute('data-log-json');
-          if (raw) {
-            try {
-              const data = JSON.parse(raw);
-              openDetailModal(data);
-            } catch (err) {
-              console.error('Error parsing row JSON:', err);
-            }
-          }
+      const dailySummary = {};
+      let monthTotalMinutes = 0;
+      let todayTotalMinutes = 0;
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      allLogs.forEach((item) => {
+        if (!item.from_time) return;
+        const dStr = item.from_time.slice(0, 10);
+        const mins = Number(item.duration_minutes || 0);
+
+        // Daily Summary
+        dailySummary[dStr] = (dailySummary[dStr] || 0) + (mins / 60);
+
+        // Check if in current calendar month
+        const itemDate = new Date(item.from_time);
+        if (itemDate.getFullYear() === currentYear && itemDate.getMonth() + 1 === currentMonth) {
+          monthTotalMinutes += mins;
         }
-      }
-    });
+
+        // Check if today
+        if (dStr === todayStr) {
+          todayTotalMinutes += mins;
+        }
+      });
+
+      state.calendar.dailySummary = dailySummary;
+      state.calendar.monthTotalHours = monthTotalMinutes / 60;
+      state.calendar.todayTotalHours = todayTotalMinutes / 60;
+
+      // Update KPIs
+      const kpiTodayHours = document.getElementById('kpi-today-hours');
+      const kpiMonthHours = document.getElementById('kpi-month-hours');
+      if (kpiTodayHours) kpiTodayHours.textContent = `${state.calendar.todayTotalHours.toFixed(1)}h`;
+      if (kpiMonthHours) kpiMonthHours.textContent = `${state.calendar.monthTotalHours.toFixed(1)}h`;
+
+      renderCalendarGrid();
+
+      // Filter for currently selected date
+      const logsForDate = allLogs.filter((l) => (l.from_time || '').slice(0, 10) === selectedDate);
+      renderDailyBreakdownTable(logsForDate);
+    } catch (e) {
+      console.warn('Error refreshing calendar and table:', e);
+    }
   }
 
-  // 11. Full Details Inspection Modal
-  function openDetailModal(data) {
+  // 11. Frappe Desk Clickable Row Modal
+  function openDetailModal(log) {
+    const detailModal = document.getElementById('timesheet-detail-modal');
+    const detailDeskLink = document.getElementById('detail-desk-link');
+    const detailProject = document.getElementById('detail-project');
+    const detailTask = document.getElementById('detail-task');
+    const detailActivity = document.getElementById('detail-activity');
+    const detailDuration = document.getElementById('detail-duration');
+    const detailBilling = document.getElementById('detail-billing');
+    const detailAssociate = document.getElementById('detail-associate');
+    const detailFrom = document.getElementById('detail-from');
+    const detailTo = document.getElementById('detail-to');
+    const detailNotes = document.getElementById('detail-notes');
+    const detailStatusPill = document.getElementById('detail-status-pill');
+
     if (!detailModal) return;
 
-    detailProject.textContent = data.project_name || data.project || 'General Operations';
-    detailTask.textContent = data.task_name || data.task ? `Task: ${data.task_name || data.task}` : 'Task: General / No Specific Task';
-    detailActivity.textContent = data.activity_type || 'Development';
-    detailBilling.textContent = (data.is_billable === 1 || data.is_billable === true) ? 'Client Billable' : 'Non-Billable';
+    if (detailDeskLink && log.name) {
+      detailDeskLink.href = `/desk/timesheet-log/${log.name}`;
+      detailDeskLink.style.display = 'inline-flex';
+    } else if (detailDeskLink) {
+      detailDeskLink.style.display = 'none';
+    }
 
-    const mins = Number(data.duration_minutes || (data.total_hours ? data.total_hours * 60 : 0));
-    const hrs = (mins / 60).toFixed(2);
-    detailDuration.textContent = `${mins} mins (${hrs} hrs)`;
+    if (detailProject) detailProject.textContent = log.project_name || log.project || 'General Operations';
+    if (detailTask) detailTask.textContent = log.task || 'None';
+    if (detailActivity) detailActivity.textContent = log.activity_type || 'Development';
+    if (detailDuration) detailDuration.textContent = `${log.duration_minutes || 0} minutes (${((Number(log.duration_minutes || 0)) / 60).toFixed(1)} hrs)`;
+    if (detailBilling) detailBilling.textContent = log.is_billable ? 'Billable' : 'Non-billable';
+    if (detailAssociate) detailAssociate.textContent = log.employee_name || log.user || 'Administrator';
+    if (detailFrom) detailFrom.textContent = log.from_time ? new Date(log.from_time).toLocaleString() : '-';
+    if (detailTo) detailTo.textContent = log.to_time ? new Date(log.to_time).toLocaleString() : '-';
+    if (detailNotes) detailNotes.textContent = log.accomplishments || log.description || 'No notes provided.';
 
-    detailAssociate.textContent = data.employee_name || data.employee_id || state.currentUserProfile.full_name || 'Associate';
-    detailFrom.textContent = data.from_time ? new Date(data.from_time).toLocaleString() : '--';
-    detailTo.textContent = data.to_time ? new Date(data.to_time).toLocaleString() : '--';
-    detailNotes.textContent = data.accomplishments || data.description || data.steps_part_b || data.summary_part_a || 'No notes logged';
-
-    if (data.is_queued) {
-      detailStatusPill.className = 'sync-pill offline';
-      detailStatusPill.textContent = data.sync_status === 'failed' ? '⚠️ Sync Failed' : 'Queued Offline';
-      if (detailDeskLink) detailDeskLink.style.display = 'none';
-    } else {
-      detailStatusPill.className = 'sync-pill';
-      detailStatusPill.textContent = 'Synced with Cloud';
-      if (detailDeskLink) {
-        if (data.name) {
-          detailDeskLink.style.display = 'inline-flex';
-          detailDeskLink.href = `/app/timesheet-log/${data.name}`;
-        } else {
-          detailDeskLink.style.display = 'none';
-        }
+    if (detailStatusPill) {
+      if (log.sync_status === 'failed') {
+        detailStatusPill.className = 'sync-pill failed';
+        detailStatusPill.textContent = '⚠️ Sync Failed';
+      } else if (log.sync_status === 'pending') {
+        detailStatusPill.className = 'sync-pill pending';
+        detailStatusPill.textContent = '🔄 Queued Offline';
+      } else {
+        detailStatusPill.className = 'sync-pill';
+        detailStatusPill.textContent = '✓ Saved in Cloud';
       }
     }
 
@@ -1012,28 +802,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function closeDetailModal() {
+    const detailModal = document.getElementById('timesheet-detail-modal');
     if (detailModal) {
       detailModal.classList.remove('open');
       detailModal.style.display = 'none';
     }
   }
 
-  if (detailModalClose) detailModalClose.addEventListener('click', closeDetailModal);
-  if (detailCloseBtn) detailCloseBtn.addEventListener('click', closeDetailModal);
-  if (detailCopyBtn) {
-    detailCopyBtn.addEventListener('click', async () => {
-      const text = detailNotes.textContent;
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('✓ Notes copied to clipboard!', 'success');
-      } catch (e) {
-        prompt('Copy notes:', text);
-      }
-    });
-  }
-
   // 12. AppSheet-Style Unified Sync Queue Drawer Modal (With Conditional Discard)
   async function openSyncQueueModal() {
+    const syncQueueModal = document.getElementById('sync-queue-modal');
     if (!syncQueueModal) return;
 
     await renderSyncQueueModal();
@@ -1042,6 +820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function closeSyncQueueModal() {
+    const syncQueueModal = document.getElementById('sync-queue-modal');
     if (syncQueueModal) {
       syncQueueModal.classList.remove('open');
       syncQueueModal.style.display = 'none';
@@ -1049,194 +828,134 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function renderSyncQueueModal() {
+    const syncQueueListContainer = document.getElementById('sync-queue-list-container');
+    const syncModalStatusBadge = document.getElementById('sync-modal-status-badge');
+    const syncModalFooterCount = document.getElementById('sync-modal-footer-count');
     if (!syncQueueListContainer) return;
     syncQueueListContainer.innerHTML = '';
 
-    const queue = await window.TimesheetDB.getQueue();
+    const queue = window.TimesheetDB ? await window.TimesheetDB.getQueue() : [];
     const isOnline = navigator.onLine;
 
     // 1. Connection Status Badge
     if (syncModalStatusBadge) {
       if (isOnline) {
         syncModalStatusBadge.className = 'sync-pill';
-        syncModalStatusBadge.textContent = '🟢 Online';
+        syncModalStatusBadge.textContent = '🟢 Online (Cloud Ready)';
       } else {
-        syncModalStatusBadge.className = 'sync-pill offline';
-        syncModalStatusBadge.textContent = '🔴 Offline';
+        syncModalStatusBadge.className = 'sync-pill pending';
+        syncModalStatusBadge.textContent = '🔴 Offline (Working Locally)';
       }
     }
 
-    // 2. Footer Count
-    if (syncModalFooterCount) {
-      const failedCount = queue.filter((q) => q.sync_status === 'failed').length;
-      if (failedCount > 0) {
-        syncModalFooterCount.textContent = `${queue.length} items (${failedCount} failed)`;
-      } else {
-        syncModalFooterCount.textContent = `${queue.length} item${queue.length === 1 ? '' : 's'} queued`;
-      }
-    }
-
-    // 3. Render Cards
-    if (queue.length === 0) {
+    // 2. Empty State
+    if (!queue || queue.length === 0) {
       syncQueueListContainer.innerHTML = `
         <div style="text-align: center; padding: 32px 16px; color: var(--text-dim);">
           <div style="font-size: 2rem; margin-bottom: 8px;">✓</div>
-          <div style="font-weight: 700; color: var(--text-main);">All Synced</div>
-          <div style="font-size: 0.82rem; margin-top: 4px;">No unsaved local changes waiting to upload.</div>
+          <div style="font-weight: 700; color: var(--text-main);">All Caught Up!</div>
+          <div style="font-size: 0.82rem; margin-top: 4px;">There are no pending changes waiting to sync.</div>
         </div>
       `;
+      if (syncModalFooterCount) syncModalFooterCount.textContent = '0 items pending';
       return;
     }
 
-    queue.forEach((q) => {
-      const isFailed = q.sync_status === 'failed';
+    if (syncModalFooterCount) {
+      syncModalFooterCount.textContent = `${queue.length} item${queue.length > 1 ? 's' : ''} in queue`;
+    }
+
+    // 3. Render Items
+    queue.forEach((item) => {
+      const isFailed = item.sync_status === 'failed';
+      const isSyncing = item.sync_status === 'syncing';
       const card = document.createElement('div');
-      card.className = `queue-item-card ${isFailed ? 'failed' : ''}`;
-      card.setAttribute('data-uuid', q.client_uuid);
+      card.className = `queue-item-card ${isFailed ? 'has-error' : ''}`;
 
-      let statusPillHtml = '';
+      let statusBadge = `<span class="sync-pill pending">🔄 Pending</span>`;
       if (isFailed) {
-        statusPillHtml = `<span class="sync-pill offline" style="font-size: 0.72rem;">⚠️ Sync Failed</span>`;
-      } else if (q.sync_status === 'syncing') {
-        statusPillHtml = `<span class="sync-pill syncing" style="font-size: 0.72rem;">🔄 Syncing...</span>`;
-      } else {
-        statusPillHtml = `<span class="sync-pill pending" style="font-size: 0.72rem; color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.4);">⏳ Queued Offline</span>`;
+        statusBadge = `<span class="sync-pill failed">⚠️ Failed</span>`;
+      } else if (isSyncing) {
+        statusBadge = `<span class="sync-pill syncing">🔄 Syncing</span>`;
       }
 
-      let actionsHtml = '';
-      let errorBoxHtml = '';
-
-      // APPSHEET CONDITIONAL DISCARD: Action buttons appear ONLY on failed / stuck items!
-      if (isFailed) {
-        errorBoxHtml = `
+      let errorMsgHtml = '';
+      if (isFailed && item.error_message) {
+        errorMsgHtml = `
           <div class="queue-error-box">
-            <strong>Error:</strong> ${escapeHtml(q.error_message || 'Server rejected submission. Please review or discard.')}
-          </div>
-        `;
-        actionsHtml = `
-          <div style="display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end;">
-            <button type="button" class="btn-queue-retry" data-uuid="${q.client_uuid}">🔁 Retry</button>
-            <button type="button" class="btn-queue-discard" data-uuid="${q.client_uuid}">🗑️ Discard</button>
+            <strong>Server Error:</strong> ${escapeHtml(item.error_message)}
           </div>
         `;
       }
+
+      // APPSHEET CONDITIONAL DISCARD: Only show Discard/Retry for FAILED items!
+      let actionsHtml = '';
+      if (isFailed) {
+        actionsHtml = `
+          <div class="queue-actions-row">
+            <button type="button" class="btn-queue-discard" data-uuid="${item.client_uuid}">
+              🗑️ Discard
+            </button>
+            <button type="button" class="btn-queue-retry" data-uuid="${item.client_uuid}">
+              🔄 Retry
+            </button>
+          </div>
+        `;
+      }
+
+      const proj = item.project_name || item.project || 'General Operations';
+      const mins = item.duration_minutes || 0;
+      const fromFormatted = item.from_time ? formatTimeOnly(item.from_time) : '';
+      const toFormatted = item.to_time ? formatTimeOnly(item.to_time) : '';
 
       card.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+        <div class="queue-item-header">
           <div>
-            <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
-              ${escapeHtml(q.project_name || q.project || 'General Operations')}
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-              ${escapeHtml(q.activity_type || 'Development')} • ${q.duration_minutes} mins
-            </div>
+            <div style="font-weight: 700; color: var(--text-main); font-size: 0.92rem;">${escapeHtml(proj)}</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">${mins} mins • ${fromFormatted} - ${toFormatted}</div>
           </div>
-          ${statusPillHtml}
+          ${statusBadge}
         </div>
-        <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: 6px; font-family: var(--font-mono);">
-          ${new Date(q.timestamp || Date.now()).toLocaleTimeString()} (${q.client_uuid.slice(0, 12)}...)
-        </div>
-        ${errorBoxHtml}
+        ${errorMsgHtml}
         ${actionsHtml}
       `;
-
       syncQueueListContainer.appendChild(card);
     });
   }
 
-  // EVENT DELEGATION: Sync Queue Modal Item Actions (Discard & Retry)
-  if (syncQueueListContainer) {
-    syncQueueListContainer.addEventListener('click', async (e) => {
-      const discardBtn = e.target.closest('.btn-queue-discard');
-      if (discardBtn) {
-        const uuid = discardBtn.getAttribute('data-uuid');
-        if (uuid) {
-          await window.TimesheetSync.discardQueueItem(uuid);
-          await renderSyncQueueModal();
-          await refreshCalendarAndTable();
-          showToast('🗑️ Discarded corrupted queue item', 'info');
-        }
-        return;
-      }
-
-      const retryBtn = e.target.closest('.btn-queue-retry');
-      if (retryBtn) {
-        const uuid = retryBtn.getAttribute('data-uuid');
-        if (uuid) {
-          showToast('🔄 Retrying item sync...', 'info');
-          await window.TimesheetSync.retryQueueItem(uuid);
-          await renderSyncQueueModal();
-          await refreshCalendarAndTable();
-        }
-        return;
-      }
-    });
-  }
-
-  // Open Queue Modal on Widget Click
-  if (appsheetSyncWidget) {
-    appsheetSyncWidget.addEventListener('click', openSyncQueueModal);
-  }
-
-  if (syncQueueModalClose) syncQueueModalClose.addEventListener('click', closeSyncQueueModal);
-  if (btnCloseSyncModal) btnCloseSyncModal.addEventListener('click', closeSyncQueueModal);
-
-  if (btnForceSyncNow) {
-    btnForceSyncNow.addEventListener('click', async () => {
-      showToast('🔄 Syncing queue with server...', 'info');
-      await window.TimesheetSync.drainQueue();
-      await renderSyncQueueModal();
-      await refreshCalendarAndTable();
-    });
-  }
-
-  // Modal Backdrop Click to Close
-  [setupModal, detailModal, syncQueueModal].forEach((m) => {
-    if (m) {
-      m.addEventListener('click', (e) => {
-        if (e.target === m) {
-          m.classList.remove('open');
-          m.style.display = 'none';
-        }
-      });
-    }
-  });
-
-  // Global Escape Key to Close Modals
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeSetupModal();
-      closeDetailModal();
-      closeSyncQueueModal();
-    }
-  });
-
-  // 13. Load Metadata
+  // 13. Metadata Loader
   async function loadMetadata() {
+    const projectSelect = document.getElementById('input-project');
+    const activitySelect = document.getElementById('input-activity');
+
     try {
-      const bundle = await window.TimesheetSync.refreshMetadataBundle();
+      const bundle = window.TimesheetSync ? await window.TimesheetSync.refreshMetadataBundle() : null;
       if (bundle) {
         state.metadata = bundle;
 
-        projectSelect.innerHTML = '';
-        (bundle.projects || []).forEach((p) => {
-          const opt = document.createElement('option');
-          opt.value = p.name;
-          opt.textContent = p.project_name || p.name;
-          projectSelect.appendChild(opt);
-        });
+        if (projectSelect) {
+          projectSelect.innerHTML = '';
+          (bundle.projects || []).forEach((p) => {
+            const opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = p.project_name || p.name;
+            projectSelect.appendChild(opt);
+          });
+          if (projectSelect.options.length > 0) projectSelect.selectedIndex = 0;
+        }
 
-        activitySelect.innerHTML = '';
-        (bundle.activity_types || []).forEach((a) => {
-          const opt = document.createElement('option');
-          opt.value = a.name;
-          opt.textContent = a.activity_type || a.name;
-          activitySelect.appendChild(opt);
-        });
+        if (activitySelect) {
+          activitySelect.innerHTML = '';
+          (bundle.activity_types || []).forEach((a) => {
+            const opt = document.createElement('option');
+            opt.value = a.name;
+            opt.textContent = a.activity_type || a.name;
+            activitySelect.appendChild(opt);
+          });
+          if (activitySelect.options.length > 0) activitySelect.selectedIndex = 0;
+        }
 
-        if (projectSelect.options.length > 0) projectSelect.selectedIndex = 0;
         updateTaskOptions();
-        if (activitySelect.options.length > 0) activitySelect.selectedIndex = 0;
       }
     } catch (err) {
       console.warn('Metadata load fallback:', err);
@@ -1244,6 +963,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateTaskOptions() {
+    const projectSelect = document.getElementById('input-project');
+    const taskSelect = document.getElementById('input-task');
+    if (!projectSelect || !taskSelect) return;
+
     const selectedProj = projectSelect.value;
     taskSelect.innerHTML = '<option value="">-- General / No Specific Task --</option>';
     const filtered = (state.metadata.tasks || []).filter((t) => !selectedProj || t.project === selectedProj);
@@ -1255,62 +978,399 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  projectSelect.addEventListener('change', updateTaskOptions);
+  // 14. Global Event Delegation (Guarantees ALL buttons work 100% of the time)
+  function initGlobalEventDelegation() {
+    document.addEventListener('click', async (e) => {
+      const target = e.target;
+      if (!target) return;
 
-  // Copy Markdown Day Report
-  if (copyDayReportBtn) {
-    copyDayReportBtn.addEventListener('click', async () => {
-      const targetDate = state.calendar.selectedDate;
-      const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?date=${targetDate}`);
-      const data = resp.ok ? await resp.json() : {};
-      const logs = (data.message && data.message.logs) || [];
-
-      let md = `# 📋 Daily Timesheet Report (${targetDate})\n\n`;
-      if (logs.length === 0) {
-        md += `_No activities recorded for this date._\n`;
-      } else {
-        logs.forEach((item) => {
-          const mins = Number(item.duration_minutes || 0);
-          const proj = item.project_name || item.project || 'General';
-          const notes = item.accomplishments || item.description || item.steps_part_b || '';
-          md += `### ${proj} (${mins} mins):\n${notes}\n\n`;
-        });
+      // 1. Start Work Buttons
+      if (target.closest('#btn-start-new-session') || target.closest('#btn-header-start')) {
+        e.preventDefault();
+        openSetupModal('new');
+        return;
       }
 
-      try {
-        await navigator.clipboard.writeText(md);
-        showToast('✓ Markdown report copied to clipboard!', 'success');
-      } catch (e) {
-        prompt('Copy report manually:', md);
+      // 2. Change Project Button
+      if (target.closest('#btn-change-project')) {
+        e.preventDefault();
+        openSetupModal('switch');
+        return;
+      }
+
+      // 3. Close Setup Modal
+      if (target.closest('#setup-modal-close')) {
+        e.preventDefault();
+        closeSetupModal();
+        return;
+      }
+
+      // 4. Submit Setup Modal
+      if (target.closest('#btn-start-session-modal')) {
+        e.preventDefault();
+        await handleModalSubmit();
+        return;
+      }
+
+      // 5. Timer Controls
+      if (target.closest('#timer-pause-btn')) {
+        e.preventDefault();
+        pauseTimer();
+        return;
+      }
+      if (target.closest('#timer-resume-btn')) {
+        e.preventDefault();
+        startTimer();
+        return;
+      }
+
+      // 6. Finish & Save Session
+      if (target.closest('#btn-finish-and-next')) {
+        e.preventDefault();
+        await finishSessionAndUnmount();
+        return;
+      }
+
+      // 7. Theme Toggle
+      if (target.closest('#theme-toggle-btn')) {
+        e.preventDefault();
+        toggleTheme();
+        return;
+      }
+
+      // 8. Voice Mic
+      if (target.closest('#voice-mic-btn')) {
+        e.preventDefault();
+        if (window.TimesheetVoice && window.TimesheetVoice.toggle) {
+          window.TimesheetVoice.toggle();
+        }
+        return;
+      }
+
+      // 9. Add Manual Point
+      if (target.closest('#btn-add-manual-point')) {
+        e.preventDefault();
+        const input = document.getElementById('manual-point-input');
+        if (input) {
+          addPoint(input.value);
+          input.value = '';
+        }
+        return;
+      }
+
+      // 10. Delete Accomplishment Point
+      const delPointBtn = target.closest('.btn-del-point');
+      if (delPointBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = delPointBtn.getAttribute('data-id');
+        state.currentSession.points = (state.currentSession.points || []).filter((p) => p.id !== id);
+        renderLivePoints();
+        saveSessionState();
+        showToast('Point removed', 'info');
+        return;
+      }
+
+      // 11. Expand Accomplishment Text
+      const textCell = target.closest('.point-text-cell');
+      if (textCell) {
+        textCell.classList.toggle('expanded');
+        return;
+      }
+
+      // 12. Calendar Navigation
+      if (target.closest('#cal-prev-btn')) {
+        e.preventDefault();
+        state.calendar.currentMonth--;
+        if (state.calendar.currentMonth < 1) {
+          state.calendar.currentMonth = 12;
+          state.calendar.currentYear--;
+        }
+        await refreshCalendarAndTable();
+        return;
+      }
+      if (target.closest('#cal-next-btn')) {
+        e.preventDefault();
+        state.calendar.currentMonth++;
+        if (state.calendar.currentMonth > 12) {
+          state.calendar.currentMonth = 1;
+          state.calendar.currentYear++;
+        }
+        await refreshCalendarAndTable();
+        return;
+      }
+      if (target.closest('#cal-today-btn')) {
+        e.preventDefault();
+        const t = new Date();
+        state.calendar.currentYear = t.getFullYear();
+        state.calendar.currentMonth = t.getMonth() + 1;
+        state.calendar.selectedDate = t.toISOString().slice(0, 10);
+        await refreshCalendarAndTable();
+        return;
+      }
+
+      // 13. Calendar Cell Selection
+      const calCell = target.closest('.cal-cell[data-date]');
+      if (calCell) {
+        e.preventDefault();
+        state.calendar.selectedDate = calCell.getAttribute('data-date');
+        await refreshCalendarAndTable();
+        return;
+      }
+
+      // 14. Daily Table Row Click -> Open Desk Detail Modal
+      const tableRow = target.closest('tr[data-log-json]');
+      if (tableRow) {
+        e.preventDefault();
+        try {
+          const log = JSON.parse(tableRow.getAttribute('data-log-json'));
+          openDetailModal(log);
+        } catch (err) {
+          console.warn('Error parsing log row:', err);
+        }
+        return;
+      }
+
+      // 15. Detail Modal Close
+      if (target.closest('#detail-modal-close') || target.closest('#detail-close-btn')) {
+        e.preventDefault();
+        closeDetailModal();
+        return;
+      }
+
+      // 16. Detail Modal Copy Notes
+      if (target.closest('#detail-copy-btn')) {
+        e.preventDefault();
+        const text = document.getElementById('detail-notes')?.textContent || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast('✓ Notes copied to clipboard!', 'success');
+        } catch (err) {
+          prompt('Copy notes:', text);
+        }
+        return;
+      }
+
+      // 17. AppSheet Sync Widget
+      if (target.closest('#appsheet-sync-widget')) {
+        e.preventDefault();
+        openSyncQueueModal();
+        return;
+      }
+
+      // 18. Sync Queue Modal Close
+      if (target.closest('#sync-queue-modal-close') || target.closest('#btn-close-sync-modal')) {
+        e.preventDefault();
+        closeSyncQueueModal();
+        return;
+      }
+
+      // 19. Sync Queue Force Sync Now
+      if (target.closest('#btn-force-sync-now')) {
+        e.preventDefault();
+        showToast('🔄 Syncing queue with server...', 'info');
+        if (window.TimesheetSync && window.TimesheetSync.drainQueue) {
+          await window.TimesheetSync.drainQueue();
+        }
+        await renderSyncQueueModal();
+        await refreshCalendarAndTable();
+        return;
+      }
+
+      // 20. Sync Queue Item Discard
+      const discardBtn = target.closest('.btn-queue-discard');
+      if (discardBtn) {
+        e.preventDefault();
+        const uuid = discardBtn.getAttribute('data-uuid');
+        if (uuid && window.TimesheetSync && window.TimesheetSync.discardQueueItem) {
+          await window.TimesheetSync.discardQueueItem(uuid);
+          await renderSyncQueueModal();
+          await refreshCalendarAndTable();
+          showToast('Item discarded from offline queue', 'info');
+        }
+        return;
+      }
+
+      // 21. Sync Queue Item Retry
+      const retryBtn = target.closest('.btn-queue-retry');
+      if (retryBtn) {
+        e.preventDefault();
+        const uuid = retryBtn.getAttribute('data-uuid');
+        if (uuid && window.TimesheetSync && window.TimesheetSync.retryQueueItem) {
+          showToast('Retrying sync...', 'info');
+          await window.TimesheetSync.retryQueueItem(uuid);
+          await renderSyncQueueModal();
+          await refreshCalendarAndTable();
+        }
+        return;
+      }
+
+      // 22. Copy Day Markdown Report
+      if (target.closest('#copy-day-report-btn')) {
+        e.preventDefault();
+        const targetDate = state.calendar.selectedDate;
+        let logs = [];
+        try {
+          const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?date=${targetDate}`);
+          const data = resp.ok ? await resp.json() : {};
+          logs = (data.message && data.message.logs) || [];
+        } catch (e) {}
+
+        let md = `# 📋 Daily Timesheet Report (${targetDate})\n\n`;
+        if (logs.length === 0) {
+          md += `_No activities recorded for this date._\n`;
+        } else {
+          logs.forEach((item) => {
+            const mins = Number(item.duration_minutes || 0);
+            const proj = item.project_name || item.project || 'General';
+            const notes = item.accomplishments || item.description || item.steps_part_b || '';
+            md += `### ${proj} (${mins} mins):\n${notes}\n\n`;
+          });
+        }
+
+        try {
+          await navigator.clipboard.writeText(md);
+          showToast('✓ Markdown report copied to clipboard!', 'success');
+        } catch (e) {
+          prompt('Copy report manually:', md);
+        }
+        return;
+      }
+
+      // 23. Modal Backdrop Click (click outside modal sheet)
+      ['project-setup-modal', 'timesheet-detail-modal', 'sync-queue-modal'].forEach((mId) => {
+        const modalEl = document.getElementById(mId);
+        if (modalEl && target === modalEl) {
+          modalEl.classList.remove('open');
+          modalEl.style.display = 'none';
+        }
+      });
+    });
+
+    // Keyboard Shortcuts & Enter Handler
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeSetupModal();
+        closeDetailModal();
+        closeSyncQueueModal();
+      }
+
+      if (e.target && e.target.id === 'manual-point-input') {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const input = e.target;
+          addPoint(input.value);
+          input.value = '';
+        }
+      }
+    });
+
+    // Project change updates tasks
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.id === 'input-project') {
+        updateTaskOptions();
       }
     });
   }
 
-  // ─── BOOT-TIME MODAL SAFETY RESET ──────────────────────────────────────────
-  // Guarantee all modals are CLOSED on every page load.
-  // Prevents a stale open modal (e.g. sync-queue-modal left open from a prior
-  // session) from acting as an invisible full-screen overlay that blocks clicks.
-  (function resetAllModalsOnBoot() {
+  // Voice Event Configuration
+  function initVoiceController() {
+    if (!window.TimesheetVoice) return;
+    let spokenBuffer = '';
+
+    window.TimesheetVoice.onStateChange((isListening) => {
+      const voiceMicBtn = document.getElementById('voice-mic-btn');
+      const voiceBtnLabel = document.getElementById('voice-btn-label');
+      if (isListening) {
+        spokenBuffer = '';
+        if (voiceMicBtn) voiceMicBtn.classList.add('recording');
+        if (voiceBtnLabel) voiceBtnLabel.textContent = 'Recording Voice... Tap to Stop & Add Point';
+      } else {
+        if (voiceMicBtn) voiceMicBtn.classList.remove('recording');
+        if (voiceBtnLabel) voiceBtnLabel.textContent = 'Tap to Speak (Voice Note)';
+
+        if (spokenBuffer.trim()) {
+          addPoint(spokenBuffer.trim());
+          spokenBuffer = '';
+        }
+      }
+    });
+
+    window.TimesheetVoice.appendTranscript = (text) => {
+      spokenBuffer += (spokenBuffer ? ' ' : '') + text;
+    };
+  }
+
+  // Safe Boot Sequence
+  async function boot() {
+    // 1. Immediately reset modals so no modal ever blocks clicks on page load
     document.querySelectorAll('.modal-backdrop').forEach((m) => {
       m.classList.remove('open');
       m.style.display = 'none';
     });
-  })();
-  // ────────────────────────────────────────────────────────────────────────────
 
-  // Bootstrap
-  initTheme();
-  await initUserProfile();
-  await loadMetadata();
-  restoreSessionState();
-  await window.TimesheetSync.updateSyncBadgeUI();
-  await refreshCalendarAndTable();
+    // 2. Initialize Theme immediately
+    initTheme();
 
-  window.TimesheetSync.onStatusChange(async () => {
-    await window.TimesheetSync.updateSyncBadgeUI();
-  });
-  window.TimesheetSync.onDataSynced(async () => {
-    await refreshCalendarAndTable();
-    await window.TimesheetSync.updateSyncBadgeUI();
-  });
-});
+    // 3. Attach Global Event Delegation immediately (synchronous)
+    initGlobalEventDelegation();
+    initVoiceController();
+
+    // 4. Safe Database & Profile Initialization
+    try {
+      if (window.TimesheetDB && window.TimesheetDB.init) {
+        await window.TimesheetDB.init();
+      }
+    } catch (e) {
+      console.warn('TimesheetDB init error:', e);
+    }
+
+    try {
+      await initUserProfile();
+    } catch (e) {
+      console.warn('User profile init error:', e);
+    }
+
+    try {
+      await loadMetadata();
+    } catch (e) {
+      console.warn('Metadata init error:', e);
+    }
+
+    try {
+      restoreSessionState();
+    } catch (e) {
+      console.warn('Restore session error:', e);
+    }
+
+    try {
+      if (window.TimesheetSync && window.TimesheetSync.updateSyncBadgeUI) {
+        await window.TimesheetSync.updateSyncBadgeUI();
+      }
+    } catch (e) {}
+
+    try {
+      await refreshCalendarAndTable();
+    } catch (e) {}
+
+    if (window.TimesheetSync) {
+      window.TimesheetSync.onStatusChange(async () => {
+        try {
+          await window.TimesheetSync.updateSyncBadgeUI();
+        } catch (e) {}
+      });
+      window.TimesheetSync.onDataSynced(async () => {
+        try {
+          await refreshCalendarAndTable();
+          await window.TimesheetSync.updateSyncBadgeUI();
+        } catch (e) {}
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();

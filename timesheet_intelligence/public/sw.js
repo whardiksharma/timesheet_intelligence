@@ -1,9 +1,10 @@
 /**
  * Service Worker for Timesheet PWA
- * Provides 100% Offline-First caching and background synchronization.
+ * Provides 100% Offline-First capability with Network-First strategy for JS/CSS assets
+ * to prevent stale cached scripts from ever blocking UI updates.
  */
 
-const CACHE_NAME = 'timesheet-pwa-v1.0.2';
+const CACHE_NAME = 'timesheet-pwa-v2.0.0';
 const PRECACHE_ASSETS = [
   '/timesheet',
   '/assets/timesheet_intelligence/css/timesheet-pwa.css',
@@ -20,73 +21,62 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Precaching App Shell assets');
       return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('[SW] Some precache items skipped during offline install:', err);
+        console.warn('[SW] Precache items skipped during offline install:', err);
       });
     }).then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate Event: Clean old cache versions
+// 2. Activate Event: Purge ALL old cache versions immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log('[SW] Purging old cache:', key);
+            return caches.delete(key);
+          }
+        })
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// 3. Fetch Event: Network-First for HTML, Cache-First for static assets, with offline fallback
+// 3. Fetch Event: Network-First for HTML, JS, CSS; Cache fallback when offline
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  const url = new URL(request.url);
 
   // Ignore non-GET and API mutations
   if (request.method !== 'GET') {
     return;
   }
 
-  // Navigation (HTML) request: Network-First with Cache Fallback
-  if (request.mode === 'navigate' || request.destination === 'document') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match('/timesheet') || caches.match(request);
-        })
-    );
-    return;
-  }
-
-  // Static Assets (CSS, JS, Fonts, Images): Stale-While-Revalidate
+  // Network-First with Cache Fallback for documents and scripts
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      const fetchPromise = fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+    fetch(request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          if (request.mode === 'navigate' || request.destination === 'document') {
+            return caches.match('/timesheet');
           }
-          return networkResponse;
-        })
-        .catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
+          return cachedResponse;
+        });
+      })
   );
 });
 
 // 4. Background Sync Event (When reconnecting online)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-timesheet-queue') {
-    console.log('[SW] Background sync triggered: sync-timesheet-queue');
     event.waitUntil(
       self.clients.matchAll().then((clients) => {
         clients.forEach((client) => {
