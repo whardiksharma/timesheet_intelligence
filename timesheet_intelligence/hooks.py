@@ -56,16 +56,23 @@ app_license = "mit"
 # Home Pages
 # ----------
 
-# home_page = "timesheet"
+home_page = "timesheet_pwa"
 
 website_route_rules = [
 	{"from_route": "/timesheet", "to_route": "timesheet_pwa"},
+	{"from_route": "/index", "to_route": "timesheet_pwa"},
 ]
 
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
+role_home_page = {
+	"Employee": "timesheet",
+	"Desk User": "timesheet",
+	"System Manager": "timesheet"
+}
+
+website_redirects = [
+	{"source": r"/index", "target": "/timesheet"},
+]
 
 # Generators
 # ----------

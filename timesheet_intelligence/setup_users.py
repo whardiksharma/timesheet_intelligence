@@ -31,8 +31,15 @@ def grant_all_access():
                 except Exception as e:
                     print(f"Could not add DocPerm for {role}: {e}")
 
+    # Set default website homepage to timesheet
+    try:
+        frappe.db.set_single_value("Website Settings", "home_page", "timesheet")
+        print("Updated Website Settings: home_page -> 'timesheet'")
+    except Exception as e:
+        print(f"Could not set home_page: {e}")
+
     frappe.db.commit()
-    print("=== DOCPERMS UPDATED ===")
+    print("=== DOCPERMS & ROUTING UPDATED ===")
 
 if __name__ == "__main__":
     grant_all_access()
