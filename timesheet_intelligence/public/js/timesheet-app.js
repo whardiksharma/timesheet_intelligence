@@ -701,74 +701,98 @@
     }
   }
 
-  // 11. Resilient Dual-Layer Hour Calculation (Optimistic UI Reconciler)
+  // 11. Optimistic Calculation Engine & Dual-Layer Reconciler
+  async function getOptimisticMetrics(targetYear, targetMonth, targetDateStr) {
+    // 1. Fetch latest baseline cached from Frappe backend
+    const serverMetrics = (await window.TimesheetDB.getMetadata('server_metrics')) || {
+      today_total_hours: 0.0,
+      month_total_hours: 0.0,
+      daily_summary: {}
+    };
+
+    // 2. Fetch pending local mutations (excluding failed poison-pill records)
+    const pendingQueue = window.TimesheetDB.getPendingQueueItems ? await window.TimesheetDB.getPendingQueueItems() : [];
+
+    let optimisticToday = Number(serverMetrics.today_total_hours || serverMetrics.today_hours || 0);
+    let optimisticMonth = Number(serverMetrics.month_total_hours || serverMetrics.month_hours || 0);
+    let optimisticDaily = { ...(serverMetrics.daily_summary || {}) };
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    for (const item of pendingQueue) {
+      const itemDate = (item.from_time || '').slice(0, 10) || todayStr;
+      const hours = parseFloat(item.total_hours) || (parseFloat(item.duration_minutes || 0) / 60.0) || 0;
+
+      // Add to daily summary map
+      optimisticDaily[itemDate] = Number(((optimisticDaily[itemDate] || 0) + hours).toFixed(2));
+
+      // Add to today hours
+      if (itemDate === todayStr) {
+        optimisticToday = Number((optimisticToday + hours).toFixed(2));
+      }
+
+      // Add to month hours if matching queried month & year
+      const [iYear, iMonth] = itemDate.split('-').map(Number);
+      if (iYear === targetYear && iMonth === targetMonth) {
+        optimisticMonth = Number((optimisticMonth + hours).toFixed(2));
+      }
+    }
+
+    return {
+      today_hours: optimisticToday,
+      month_hours: optimisticMonth,
+      daily_summary: optimisticDaily
+    };
+  }
+
   async function refreshCalendarAndTable() {
     try {
       const { currentYear, currentMonth, selectedDate } = state.calendar;
-      const todayStr = new Date().toISOString().slice(0, 10);
 
-      // 1. Fetch offline queue items first
-      const queue = window.TimesheetDB ? await window.TimesheetDB.getQueue() : [];
-
-      let backendData = null;
-      let cachedLogs = [];
-
-      // 2. Fetch fresh aggregates from Frappe Backend if online
+      // 1. If online, fetch fresh server calculations and cache them
       if (navigator.onLine) {
         try {
           const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?year=${currentYear}&month=${currentMonth}&date=${selectedDate}`);
           if (resp.ok) {
             const json = await resp.json();
-            backendData = json.message || json;
-            if (backendData) {
-              if (window.TimesheetDB) {
-                await window.TimesheetDB.saveCachedAggregates(backendData);
-                if (backendData.logs) {
-                  await window.TimesheetDB.cacheTimesheets(backendData.logs);
-                }
+            const backendData = json.message || json;
+            if (backendData && window.TimesheetDB) {
+              await window.TimesheetDB.setMetadata('server_metrics', backendData);
+              if (backendData.logs) {
+                await window.TimesheetDB.cacheTimesheets(backendData.logs);
               }
             }
           }
         } catch (netErr) {
-          console.warn('Network unreachable, falling back to local optimistic calculations:', netErr);
+          console.warn('Network unreachable, relying on cached server baseline + optimistic queue:', netErr);
         }
       }
 
-      // 3. Fallback to cached Frappe aggregates if offline
-      if (!backendData && window.TimesheetDB) {
-        backendData = await window.TimesheetDB.getCachedAggregates();
-        cachedLogs = await window.TimesheetDB.getCachedTimesheets();
-      }
+      // 2. Compute Dual-Layer Optimistic Metrics (Server Baseline + Pending Queue)
+      const metrics = await getOptimisticMetrics(currentYear, currentMonth, selectedDate);
 
-      // Base server aggregates
-      let baseDailySummary = (backendData && backendData.daily_summary) ? { ...backendData.daily_summary } : {};
-      let baseMonthTotalHours = backendData ? Number(backendData.month_total_hours || 0) : 0;
-      let baseTodayTotalHours = backendData ? Number(backendData.today_total_hours || 0) : 0;
+      state.calendar.dailySummary = metrics.daily_summary;
+      state.calendar.monthTotalHours = metrics.month_hours;
+      state.calendar.todayTotalHours = metrics.today_hours;
 
-      // Base logs
-      let combinedLogs = (backendData && backendData.logs) ? [...backendData.logs] : (cachedLogs || []);
-      const existingClientUuids = new Set(combinedLogs.map((l) => l.client_uuid || l.name));
+      // Update DOM KPI Badges
+      const kpiTodayHours = document.getElementById('kpi-today-hours');
+      const kpiMonthHours = document.getElementById('kpi-month-hours');
+      if (kpiTodayHours) kpiTodayHours.textContent = `${metrics.today_hours.toFixed(1)} hrs`;
+      if (kpiMonthHours) kpiMonthHours.textContent = `${metrics.month_hours.toFixed(1)} hrs`;
 
-      // 4. Optimistically add local pending/syncing queue items that are not yet recorded on server
-      queue.forEach((qItem) => {
+      renderCalendarGrid();
+
+      // 3. Assemble and render daily breakdown table
+      const cachedLogs = window.TimesheetDB ? await window.TimesheetDB.getCachedTimesheets() : [];
+      const pendingQueue = window.TimesheetDB ? await window.TimesheetDB.getPendingQueueItems() : [];
+
+      const existingClientUuids = new Set(cachedLogs.map((l) => l.client_uuid || l.name));
+      const combinedLogs = [...cachedLogs];
+
+      // Prepend pending queue items not yet committed in cached server logs
+      pendingQueue.forEach((qItem) => {
         if (!existingClientUuids.has(qItem.client_uuid)) {
-          const qDate = (qItem.from_time || '').slice(0, 10);
-          const qHours = Number(qItem.duration_minutes || 0) / 60.0;
-
-          if (qDate) {
-            baseDailySummary[qDate] = roundHours((baseDailySummary[qDate] || 0) + qHours);
-
-            if (qDate === todayStr) {
-              baseTodayTotalHours = roundHours(baseTodayTotalHours + qHours);
-            }
-
-            const qDateObj = new Date(qItem.from_time);
-            if (qDateObj.getFullYear() === currentYear && qDateObj.getMonth() + 1 === currentMonth) {
-              baseMonthTotalHours = roundHours(baseMonthTotalHours + qHours);
-            }
-          }
-
-          // Prepend to combined logs so it appears immediately in the table
           combinedLogs.unshift({
             name: qItem.client_uuid,
             client_uuid: qItem.client_uuid,
@@ -786,20 +810,7 @@
         }
       });
 
-      // Update state
-      state.calendar.dailySummary = baseDailySummary;
-      state.calendar.monthTotalHours = baseMonthTotalHours;
-      state.calendar.todayTotalHours = baseTodayTotalHours;
-
-      // Update DOM KPI Badges
-      const kpiTodayHours = document.getElementById('kpi-today-hours');
-      const kpiMonthHours = document.getElementById('kpi-month-hours');
-      if (kpiTodayHours) kpiTodayHours.textContent = `${baseTodayTotalHours.toFixed(1)} hrs`;
-      if (kpiMonthHours) kpiMonthHours.textContent = `${baseMonthTotalHours.toFixed(1)} hrs`;
-
-      renderCalendarGrid();
-
-      // Filter and render daily breakdown table for selected date
+      // Filter and render daily table for selected date
       const dateLogs = combinedLogs.filter((l) => (l.from_time || '').slice(0, 10) === selectedDate);
       renderDailyBreakdownTable(dateLogs);
     } catch (e) {
@@ -1440,6 +1451,7 @@
         } catch (e) {}
       });
     }
+    window.refreshTimesheetUI = refreshCalendarAndTable;
   }
 
   if (document.readyState === 'loading') {
