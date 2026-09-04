@@ -271,6 +271,32 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-color: var(--border-highlight);
 }
 
+.user-presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.user-presence-dot.active {
+  background: var(--accent-emerald, #10b981);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2), 0 0 6px var(--accent-emerald, #10b981);
+  animation: presencePulse 2s infinite ease-in-out;
+}
+
+.user-presence-dot.idle {
+  background: var(--text-dim, #94a3b8);
+  opacity: 0.6;
+}
+
+@keyframes presencePulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { transform: scale(1.15); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
 .dropdown-chevron {
   font-size: 0.7rem;
   color: var(--text-muted);
@@ -1534,18 +1560,30 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .cal-indicator-dot.present {
-  background: var(--accent-emerald);
-  box-shadow: 0 0 6px var(--accent-emerald);
+  background: var(--accent-emerald, #10b981);
+  box-shadow: 0 0 6px var(--accent-emerald, #10b981);
 }
 
-.cal-indicator-dot.partial {
-  background: var(--accent-amber);
+.cal-indicator-dot.half-day {
+  background: var(--accent-amber, #f59e0b);
+  box-shadow: 0 0 4px var(--accent-amber, #f59e0b);
 }
 
-.cal-hours-badge {
+.cal-indicator-dot.absent {
+  background: var(--accent-rose, #ef4444);
+  box-shadow: 0 0 4px var(--accent-rose, #ef4444);
+}
+
+.cal-indicator-dot.in-progress {
+  background: var(--accent-cyan, #38bdf8);
+  box-shadow: 0 0 4px var(--accent-cyan, #38bdf8);
+}
+
+.cal-badge-hours {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
@@ -1556,14 +1594,49 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   margin-top: 4px;
 }
 
-.cal-hours-badge.present {
-  background: rgba(16, 185, 129, 0.2);
-  color: var(--accent-emerald);
+.cal-badge-hours.present {
+  background: rgba(16, 185, 129, 0.16);
+  color: var(--accent-emerald, #10b981);
 }
 
-.cal-hours-badge.partial {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--accent-amber);
+.cal-badge-hours.half-day {
+  background: rgba(245, 158, 11, 0.16);
+  color: var(--accent-amber, #f59e0b);
+}
+
+.cal-badge-hours.absent {
+  background: rgba(239, 68, 68, 0.14);
+  color: var(--accent-rose, #ef4444);
+}
+
+.cal-badge-hours.in-progress {
+  background: rgba(56, 189, 248, 0.16);
+  color: var(--accent-cyan, #38bdf8);
+}
+
+.cal-badge-hours.weekend {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-dim, #94a3b8);
+}
+
+.cal-cell.status-absent {
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.cal-cell.status-present {
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.cal-cell.status-half-day {
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.cal-cell.is-weekend {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .cal-cell.is-weekend {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .calendar-legend {
@@ -1588,10 +1661,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius: 50%;
 }
 
-.legend-dot.present { background: var(--accent-emerald); }
-.legend-dot.partial { background: var(--accent-amber); }
-.legend-dot.weekend { background: var(--text-dim); }
-.legend-dot.active-ring { border: 2px solid var(--accent-cyan); background: transparent; }
+.legend-dot.present { background: var(--accent-emerald, #10b981); }
+.legend-dot.half-day { background: var(--accent-amber, #f59e0b); }
+.legend-dot.absent { background: var(--accent-rose, #ef4444); }
+.legend-dot.weekend { background: var(--text-dim, #94a3b8); }
+.legend-dot.active-ring { border: 2px solid var(--accent-cyan, #38bdf8); background: transparent; }
 
 /* --- Daily Breakdown Table --- */
 .daily-table-panel {
@@ -1726,6 +1800,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         <!-- Interactive User Profile Dropdown Menu -->
         <div class="user-profile-wrapper">
           <button type="button" id="user-profile-btn" class="user-profile-chip" aria-haspopup="true" aria-expanded="false" aria-label="User account menu" title="User account options">
+            <span class="user-presence-dot idle" id="user-presence-dot" aria-label="Presence status" title="⚪ Idle"></span>
             <span>👤</span>
             <span id="user-name-display">Administrator</span>
             <span class="dropdown-chevron" aria-hidden="true">▾</span>
@@ -1928,8 +2003,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
       <!-- Legend -->
       <div class="calendar-legend">
-        <span class="legend-item"><span class="legend-dot present"></span> Present (≥ 4h)</span>
-        <span class="legend-item"><span class="legend-dot partial"></span> Partial (&lt; 4h)</span>
+        <span class="legend-item"><span class="legend-dot present"></span> Present (≥ 8h)</span>
+        <span class="legend-item"><span class="legend-dot half-day"></span> Half Day (4-8h)</span>
+        <span class="legend-item"><span class="legend-dot absent"></span> Absent (&lt; 4h)</span>
         <span class="legend-item"><span class="legend-dot weekend"></span> Weekend</span>
         <span class="legend-item"><span class="legend-dot active-ring"></span> Selected / Filtered Date</span>
       </div>
@@ -2119,10 +2195,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <script>
     window.csrf_token = "{{ frappe.session.csrf_token if frappe.session else '' }}";
   </script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.8.1"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.8.1"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.8.1"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.8.1"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.8.2"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.8.2"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.8.2"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.8.2"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

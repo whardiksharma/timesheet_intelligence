@@ -1,7 +1,8 @@
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, getdate, get_datetime, format_datetime
-from datetime import timedelta
+from datetime import timedelta, date as dt_date
+import calendar
 import json
 
 def get_current_employee(user=None):
@@ -328,26 +329,71 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 		order_by="from_time asc"
 	)
 
-	daily_summary = {}
+	raw_day_minutes = {}
 	month_total_minutes = 0.0
 	today_total_minutes = 0.0
 
 	for m_log in month_logs:
 		dt_str = str(m_log.from_time)[:10]
 		mins = float(m_log.duration_minutes or (m_log.total_hours * 60.0 if m_log.total_hours else 0))
-		daily_summary[dt_str] = round(daily_summary.get(dt_str, 0.0) + (mins / 60.0), 2)
+		raw_day_minutes[dt_str] = raw_day_minutes.get(dt_str, 0.0) + mins
 		month_total_minutes += mins
 		if dt_str == today_date_str:
 			today_total_minutes += mins
 
 	# Calculate today's hours if not in current query range
-	if today_date_str not in daily_summary:
+	if today_date_str not in raw_day_minutes:
 		today_logs = frappe.get_all(
 			"Timesheet Log",
 			filters={"from_time": ["between", [f"{today_date_str} 00:00:00", f"{today_date_str} 23:59:59"]], **user_filters},
 			fields=["duration_minutes", "total_hours"]
 		)
 		today_total_minutes = sum(float(t.duration_minutes or 0) for t in today_logs)
+
+	# Build enriched daily_summary map with attendance classification
+	days_in_month = calendar.monthrange(target_year, target_month)[1]
+	daily_summary = {}
+
+	for day_num in range(1, days_in_month + 1):
+		d_date = dt_date(target_year, target_month, day_num)
+		d_str = d_date.strftime("%Y-%m-%d")
+		day_mins = raw_day_minutes.get(d_str, 0.0)
+		hours = round(day_mins / 60.0, 2)
+		weekday = d_date.weekday()  # 0=Mon, 4=Fri, 5=Sat, 6=Sun
+		is_weekend = (weekday >= 5)
+		is_past = (d_str < today_date_str)
+		is_today = (d_str == today_date_str)
+
+		if is_weekend:
+			if hours >= 8.0:
+				status = "present"
+			elif hours >= 4.0:
+				status = "half_day"
+			else:
+				status = "weekend"
+		elif is_past:
+			if hours >= 8.0:
+				status = "present"
+			elif hours >= 4.0:
+				status = "half_day"
+			else:
+				status = "absent"
+		elif is_today:
+			if hours >= 8.0:
+				status = "present"
+			elif hours >= 4.0:
+				status = "half_day"
+			elif hours > 0.0:
+				status = "in_progress"
+			else:
+				status = "in_progress"
+		else:
+			status = "future"
+
+		daily_summary[d_str] = {
+			"hours": hours,
+			"status": status
+		}
 
 	# 2. Fetch table logs
 	table_filters = {**user_filters}

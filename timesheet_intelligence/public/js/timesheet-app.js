@@ -163,10 +163,27 @@
             linkViewProfile.href = '/app/user-profile';
             linkViewProfile.title = `Open Frappe Desk Profile for ${displayName}`;
           }
+
+          updateUserPresence();
         }
       }
     } catch (e) {
       console.warn('Could not fetch user profile:', e);
+    }
+  }
+
+  function updateUserPresence(isActive) {
+    const dot = document.getElementById('user-presence-dot');
+    if (!dot) return;
+    const running = (typeof isActive === 'boolean') ? isActive : (state.timer.isRunning || !!localStorage.getItem('timesheet_active_session'));
+    if (running) {
+      dot.className = 'user-presence-dot active';
+      dot.setAttribute('title', '🟢 Clocked In / Active Timer Running');
+      dot.setAttribute('aria-label', 'Clocked In');
+    } else {
+      dot.className = 'user-presence-dot idle';
+      dot.setAttribute('title', '⚪ Idle');
+      dot.setAttribute('aria-label', 'Idle');
     }
   }
 
@@ -456,6 +473,7 @@
       if (timerDisplay) {
         timerDisplay.style.color = 'var(--accent-cyan)';
       }
+      updateUserPresence(true);
     } else if (status === 'paused') {
       if (timerPauseBtn) timerPauseBtn.style.display = 'none';
       if (timerResumeBtn) timerResumeBtn.style.display = 'inline-flex';
@@ -466,6 +484,7 @@
       if (timerDisplay) {
         timerDisplay.style.color = 'var(--text-muted)';
       }
+      updateUserPresence(true);
     }
   }
 
@@ -667,6 +686,7 @@
     };
     resetTimer();
     localStorage.removeItem('timesheet_active_session');
+    updateUserPresence(false);
 
     // Instant Unmount to Idle Card
     if (activeSessionCard) activeSessionCard.style.display = 'none';
@@ -693,41 +713,83 @@
     calendarDaysGrid.innerHTML = '';
 
     const firstDayIndex = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0 (Sun) - 6 (Sat)
+    // Convert to Monday-first indexing (0: Mon ... 6: Sun)
+    const mondayFirstIndex = (firstDayIndex + 6) % 7;
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const prevMonthDays = new Date(currentYear, currentMonth - 1, 0).getDate();
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
     // Prev month padding
-    for (let i = firstDayIndex - 1; i >= 0; i--) {
+    for (let i = mondayFirstIndex - 1; i >= 0; i--) {
       const dNum = prevMonthDays - i;
       const cell = document.createElement('div');
       cell.className = 'cal-cell is-other-month';
-      cell.innerHTML = `<span class="cal-day-num">${dNum}</span>`;
+      cell.innerHTML = `
+        <div class="cal-cell-top">
+          <span class="cal-day-num">${dNum}</span>
+        </div>
+      `;
       calendarDaysGrid.appendChild(cell);
     }
 
     // Current month days
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const hours = dailySummary[dateStr] || 0;
-      const isSelected = dateStr === selectedDate;
-      const isToday = dateStr === todayStr;
+      const entry = dailySummary ? dailySummary[dateStr] : null;
+      const hours = (typeof entry === 'object' && entry !== null) ? Number(entry.hours || 0) : Number(entry || 0);
 
+      const dateObj = new Date(currentYear, currentMonth - 1, d);
+      const dayOfWeek = dateObj.getDay(); // 0 = Sun, 6 = Sat
+      const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+      const isPast = (dateStr < todayStr);
+      const isToday = (dateStr === todayStr);
+      const isSelected = (dateStr === selectedDate);
+
+      let status = 'future';
+      if (typeof entry === 'object' && entry !== null && entry.status) {
+        status = entry.status;
+      } else if (isWeekend) {
+        status = hours >= 8.0 ? 'present' : (hours >= 4.0 ? 'half_day' : 'weekend');
+      } else if (isPast) {
+        status = hours >= 8.0 ? 'present' : (hours >= 4.0 ? 'half_day' : 'absent');
+      } else if (isToday) {
+        status = hours >= 8.0 ? 'present' : (hours >= 4.0 ? 'half_day' : (hours > 0 || state.timer.isRunning ? 'in_progress' : 'in_progress'));
+      }
+
+      const statusCssClass = status.replace('_', '-');
       const cell = document.createElement('div');
-      cell.className = `cal-cell${isSelected ? ' is-selected' : ''}${isToday ? ' is-today' : ''}`;
+      cell.className = `cal-cell status-${statusCssClass}${isSelected ? ' is-selected' : ''}${isToday ? ' is-today' : ''}${isWeekend ? ' is-weekend' : ''}`;
       cell.setAttribute('data-date', dateStr);
       cell.setAttribute('tabindex', '0');
       cell.setAttribute('role', 'button');
-      cell.setAttribute('aria-label', `${dateStr}: ${hours.toFixed(1)} hours logged`);
+      cell.setAttribute('aria-label', `${dateStr}: ${hours.toFixed(1)} hours logged (${status})`);
 
+      // Indicator Dot
+      let dotHtml = '';
+      if (status === 'present') {
+        dotHtml = '<span class="cal-indicator-dot present" title="🟢 Present (≥8h)" aria-hidden="true"></span>';
+      } else if (status === 'half_day') {
+        dotHtml = '<span class="cal-indicator-dot half-day" title="🟡 Half Day (4-8h)" aria-hidden="true"></span>';
+      } else if (status === 'absent') {
+        dotHtml = '<span class="cal-indicator-dot absent" title="🔴 Absent (<4h)" aria-hidden="true"></span>';
+      } else if (status === 'in_progress' && (hours > 0 || isToday)) {
+        dotHtml = '<span class="cal-indicator-dot in-progress" title="🔵 In Progress" aria-hidden="true"></span>';
+      }
+
+      // Hours Badge
       let badgeHtml = '';
       if (hours > 0) {
-        badgeHtml = `<span class="cal-badge-hours">${hours.toFixed(1)}h</span>`;
+        badgeHtml = `<span class="cal-badge-hours ${statusCssClass}">${hours.toFixed(1)}h</span>`;
+      } else if (isPast && !isWeekend) {
+        badgeHtml = `<span class="cal-badge-hours absent">0.0h</span>`;
       }
 
       cell.innerHTML = `
-        <span class="cal-day-num">${d}</span>
+        <div class="cal-cell-top">
+          <span class="cal-day-num">${d}</span>
+          ${dotHtml}
+        </div>
         ${badgeHtml}
       `;
       calendarDaysGrid.appendChild(cell);
@@ -825,8 +887,33 @@
       const itemDate = (item.from_time || '').slice(0, 10) || todayStr;
       const hours = parseFloat(item.total_hours) || (parseFloat(item.duration_minutes || 0) / 60.0) || 0;
 
-      // Add to daily summary map
-      optimisticDaily[itemDate] = Number(((optimisticDaily[itemDate] || 0) + hours).toFixed(2));
+      const currentEntry = optimisticDaily[itemDate];
+      const baseHours = (typeof currentEntry === 'object' && currentEntry !== null)
+        ? Number(currentEntry.hours || 0)
+        : Number(currentEntry || 0);
+      const newHours = Number((baseHours + hours).toFixed(2));
+
+      // Recompute status
+      const [y, m, d] = itemDate.split('-').map(Number);
+      const dObj = new Date(y, m - 1, d);
+      const dayOfWeek = dObj.getDay();
+      const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+      const isPast = (itemDate < todayStr);
+      const isToday = (itemDate === todayStr);
+
+      let newStatus = 'future';
+      if (isWeekend) {
+        newStatus = newHours >= 8.0 ? 'present' : (newHours >= 4.0 ? 'half_day' : 'weekend');
+      } else if (isPast) {
+        newStatus = newHours >= 8.0 ? 'present' : (newHours >= 4.0 ? 'half_day' : 'absent');
+      } else if (isToday) {
+        newStatus = newHours >= 8.0 ? 'present' : (newHours >= 4.0 ? 'half_day' : 'in_progress');
+      }
+
+      optimisticDaily[itemDate] = {
+        hours: newHours,
+        status: newStatus
+      };
 
       // Add to today hours
       if (itemDate === todayStr) {
