@@ -107,15 +107,35 @@ class TimesheetSync {
       if (response.ok) {
         const result = await response.json();
         const message = result.message || result;
-        const processedIds = message.processed_ids || pendingItems.map((q) => q.client_uuid);
+        const resultsList = message.results || [];
+        const processedIds = message.processed_ids || [];
+
+        // Update failed items in local queue with their specific error message
+        for (const res of resultsList) {
+          if (res.status === 'failed') {
+            const item = pendingItems.find((q) => q.client_uuid === res.client_uuid);
+            if (item) {
+              item.sync_status = 'failed';
+              item.error_message = res.error || 'Server validation rejected';
+              await window.TimesheetDB.updateQueueItem(item);
+            }
+          }
+        }
 
         // Remove successfully processed items from local queue
-        await window.TimesheetDB.removeQueueItems(processedIds);
+        if (processedIds.length > 0) {
+          await window.TimesheetDB.removeQueueItems(processedIds);
+        }
 
-        // Refresh recent logs from server
+        // Refresh recent logs and server aggregates
         await this.fetchLatestTimesheets();
 
-        this.notifyStatusChange('synced');
+        if (message.failed_count > 0) {
+          this.notifyStatusChange('error');
+        } else {
+          this.notifyStatusChange('synced');
+        }
+
         this.onDataSyncedCallbacks.forEach((cb) => {
           try {
             cb(processedIds.length);

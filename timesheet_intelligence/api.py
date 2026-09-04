@@ -143,11 +143,21 @@ def get_offline_bundle():
 @frappe.whitelist(allow_guest=True)
 def sync_offline_queue(queue=None):
 	"""
-	Batch ingestion endpoint for offline mutations queued in client IndexedDB.
-	Guarantees idempotency via client_uuid and strictly assigns the authenticated session user.
+	AppSheet-grade idempotent batch ingestion endpoint for offline mutations queued in client IndexedDB.
+	Guarantees:
+	1. Strict FIFO sequential processing.
+	2. Idempotency Check via client_uuid (prevents duplicate records on retries/reconnections).
+	3. MariaDB Savepoint Isolation: A single failed row rolls back ONLY its own savepoint, allowing valid rows in the batch to commit cleanly.
+	4. Returns structured per-item results with exact server error reasons for failed items.
 	"""
 	if not queue:
-		return {"status": "success", "synced_count": 0, "processed_ids": []}
+		return {
+			"status": "success",
+			"synced_count": 0,
+			"failed_count": 0,
+			"processed_ids": [],
+			"results": []
+		}
 
 	if isinstance(queue, str):
 		try:
@@ -155,13 +165,19 @@ def sync_offline_queue(queue=None):
 		except Exception as e:
 			frappe.throw(_("Invalid queue JSON: {0}").format(str(e)))
 
+	if not isinstance(queue, list):
+		queue = [queue]
+
 	session_user = frappe.session.user if frappe.session.user != "Guest" else "Administrator"
 	emp = get_current_employee(session_user)
 
 	processed_ids = []
-	created_records = []
+	results = []
 
-	for item in queue:
+	for idx, item in enumerate(queue):
+		if not isinstance(item, dict):
+			continue
+
 		client_uuid = item.get("client_uuid") or item.get("id") or frappe.generate_hash(length=12)
 		project_name = item.get("project_name") or item.get("project") or "General Operations"
 		task_name = item.get("task_name") or item.get("task") or ""
@@ -189,47 +205,80 @@ def sync_offline_queue(queue=None):
 			duration_minutes = max(1.0, round(diff, 1))
 
 		total_hours = round(duration_minutes / 60.0, 2)
-		description = (item.get("description") or item.get("notes") or "").strip()
+		description = (item.get("accomplishments") or item.get("description") or item.get("notes") or "").strip()
 
-		# Guard: Skip empty accomplishment entries
-		if not description:
-			continue
-
-		# 1. Idempotency Check
+		# 1. IDEMPOTENCY GUARD: Check if already committed
 		existing = frappe.db.get_value("Timesheet Log", {"client_uuid": client_uuid}, "name")
 		if existing:
 			processed_ids.append(client_uuid)
+			results.append({
+				"client_uuid": client_uuid,
+				"status": "synced",
+				"server_name": existing,
+				"message": "Already committed"
+			})
 			continue
 
-		# 2. Record to dedicated Timesheet Log with session-bound employee
-		ts_log_doc = frappe.get_doc({
-			"doctype": "Timesheet Log",
-			"client_uuid": client_uuid,
-			"project_name": project_name,
-			"task_name": task_name,
-			"activity_type": activity_type,
-			"employee_name": emp["employee_name"],
-			"user": session_user,
-			"status": "Completed",
-			"is_billable": is_billable,
-			"from_time": from_time,
-			"to_time": to_time,
-			"duration_minutes": duration_minutes,
-			"total_hours": total_hours,
-			"accomplishments": description
-		})
-		ts_log_doc.insert(ignore_permissions=True)
+		# 2. SAVEPOINT ISOLATION: Isolate each row insertion inside its own MariaDB savepoint
+		clean_uuid_tag = client_uuid.replace("-", "_").replace(" ", "_")[:12]
+		savepoint_name = f"sp_{clean_uuid_tag}_{idx}"
+		frappe.db.savepoint(savepoint_name)
 
-		processed_ids.append(client_uuid)
-		created_records.append(ts_log_doc.name)
+		try:
+			# Validate accomplishment content
+			if not description:
+				frappe.throw(_("Accomplishments cannot be empty. Please document what was completed."))
 
+			ts_log_doc = frappe.get_doc({
+				"doctype": "Timesheet Log",
+				"client_uuid": client_uuid,
+				"project_name": project_name,
+				"task_name": task_name,
+				"activity_type": activity_type,
+				"employee_name": emp["employee_name"],
+				"user": session_user,
+				"status": "Completed",
+				"is_billable": is_billable,
+				"from_time": from_time,
+				"to_time": to_time,
+				"duration_minutes": duration_minutes,
+				"total_hours": total_hours,
+				"accomplishments": description
+			})
+			ts_log_doc.insert(ignore_permissions=True)
+
+			processed_ids.append(client_uuid)
+			results.append({
+				"client_uuid": client_uuid,
+				"status": "synced",
+				"server_name": ts_log_doc.name
+			})
+
+		except Exception as e:
+			# Roll back ONLY this row's savepoint
+			frappe.db.rollback(save_point=savepoint_name)
+			frappe.clear_messages()
+
+			# Extract human-readable error string
+			err_msg = str(e)
+			if hasattr(e, "message") and e.message:
+				err_msg = str(e.message)
+			
+			results.append({
+				"client_uuid": client_uuid,
+				"status": "failed",
+				"error": err_msg
+			})
+
+	# Commit all valid rows in the batch
 	frappe.db.commit()
 
 	return {
 		"status": "success",
 		"synced_count": len(processed_ids),
+		"failed_count": len([r for r in results if r["status"] == "failed"]),
 		"processed_ids": processed_ids,
-		"created_records": created_records
+		"results": results
 	}
 
 @frappe.whitelist(allow_guest=True)
