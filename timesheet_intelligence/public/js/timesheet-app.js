@@ -796,6 +796,40 @@
     }
   }
 
+  async function renderDailyTableFromCache(targetDate) {
+    try {
+      const cachedLogs = window.TimesheetDB ? await window.TimesheetDB.getCachedTimesheets() : [];
+      const pendingQueue = window.TimesheetDB ? await window.TimesheetDB.getPendingQueueItems() : [];
+
+      const existingClientUuids = new Set(cachedLogs.map((l) => l.client_uuid || l.name));
+      const combinedLogs = [...cachedLogs];
+
+      pendingQueue.forEach((qItem) => {
+        if (!existingClientUuids.has(qItem.client_uuid)) {
+          combinedLogs.unshift({
+            name: qItem.client_uuid,
+            client_uuid: qItem.client_uuid,
+            project_name: qItem.project_name || qItem.project,
+            task: qItem.task,
+            activity_type: qItem.activity_type,
+            from_time: qItem.from_time,
+            to_time: qItem.to_time,
+            duration_minutes: qItem.duration_minutes,
+            total_hours: qItem.duration_minutes / 60.0,
+            accomplishments: qItem.accomplishments || qItem.description,
+            is_billable: qItem.is_billable,
+            sync_status: qItem.sync_status
+          });
+        }
+      });
+
+      const dateLogs = combinedLogs.filter((l) => (l.from_time || '').slice(0, 10) === targetDate);
+      renderDailyBreakdownTable(dateLogs);
+    } catch (e) {
+      console.warn('Error rendering table from cache:', e);
+    }
+  }
+
   // 10. Daily Timesheets Breakdown Table (Clean, AppSheet-Style, No "Queued" Clutter)
   function renderDailyBreakdownTable(logsForDate) {
     const dailyTableTitle = document.getElementById('daily-table-title');
@@ -1430,12 +1464,26 @@
         return;
       }
 
-      // 13. Calendar Cell Selection
+      // 13. Calendar Cell Selection (Instant 0ms Feedback + Async Sync)
       const calCell = target.closest('.cal-cell[data-date]');
       if (calCell) {
         e.preventDefault();
-        state.calendar.selectedDate = calCell.getAttribute('data-date');
-        await refreshCalendarAndTable();
+        const clickedDate = calCell.getAttribute('data-date');
+        if (!clickedDate) return;
+
+        state.calendar.selectedDate = clickedDate;
+
+        // 1. Instant 0ms Visual Selection Switch
+        document.querySelectorAll('.cal-cell').forEach((c) => {
+          c.classList.remove('is-selected', 'selected');
+        });
+        calCell.classList.add('is-selected', 'selected');
+
+        // 2. Instant Local Table Render from Cached DB (0ms response)
+        renderDailyTableFromCache(clickedDate);
+
+        // 3. Background Sync & Metrics Refresh
+        refreshCalendarAndTable();
         return;
       }
 
