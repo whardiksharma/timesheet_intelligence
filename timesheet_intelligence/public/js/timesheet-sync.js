@@ -1,6 +1,7 @@
 /**
- * TimesheetSync: AppSheet-Style Unified Sync Engine
- * Consolidates Sync and Queue into a single dynamic widget with per-item error handling and conditional discard.
+ * TimesheetSync: AppSheet-Style Silent Offline Sync Engine
+ * Handles silent background synchronization, per-item failure trapping,
+ * and optimistic reconciliations between client IndexedDB and Frappe backend.
  */
 
 class TimesheetSync {
@@ -45,7 +46,11 @@ class TimesheetSync {
   }
 
   notifyStatusChange(state) {
-    this.onStatusChangeCallbacks.forEach((cb) => cb(state, this));
+    this.onStatusChangeCallbacks.forEach((cb) => {
+      try {
+        cb(state, this);
+      } catch (e) {}
+    });
   }
 
   // Fetch complete bundle and cache in IndexedDB
@@ -68,7 +73,7 @@ class TimesheetSync {
     return await window.TimesheetDB.getMetadata();
   }
 
-  // Push all pending offline mutations to Frappe
+  // Push all pending offline mutations to Frappe silently in the background
   async drainQueue() {
     if (this.isSyncing || !navigator.onLine) {
       await this.updateSyncBadgeUI();
@@ -76,7 +81,10 @@ class TimesheetSync {
     }
 
     const queue = await window.TimesheetDB.getQueue();
-    if (!queue || queue.length === 0) {
+    // Only process items that are pending or syncing (not manually failed until retried)
+    const pendingItems = queue.filter((q) => q.sync_status !== 'failed');
+
+    if (!pendingItems || pendingItems.length === 0) {
       this.notifyStatusChange('synced');
       await this.updateSyncBadgeUI();
       return;
@@ -93,29 +101,33 @@ class TimesheetSync {
           'Content-Type': 'application/json',
           'X-Frappe-CSRF-Token': window.csrf_token || ''
         },
-        body: JSON.stringify({ queue: queue })
+        body: JSON.stringify({ queue: pendingItems })
       });
 
       if (response.ok) {
         const result = await response.json();
         const message = result.message || result;
-        const processedIds = message.processed_ids || queue.map((q) => q.client_uuid);
+        const processedIds = message.processed_ids || pendingItems.map((q) => q.client_uuid);
 
-        // Remove synced items from local queue
+        // Remove successfully processed items from local queue
         await window.TimesheetDB.removeQueueItems(processedIds);
 
-        // Refresh recent logs
+        // Refresh recent logs from server
         await this.fetchLatestTimesheets();
 
         this.notifyStatusChange('synced');
-        this.onDataSyncedCallbacks.forEach((cb) => cb(processedIds.length));
+        this.onDataSyncedCallbacks.forEach((cb) => {
+          try {
+            cb(processedIds.length);
+          } catch (e) {}
+        });
       } else {
         const errJson = await response.json().catch(() => ({}));
-        const errMsg = errJson._server_messages || errJson.exc || `Server rejected request (${response.status})`;
+        const errMsg = errJson._server_messages || errJson.exc || `Server rejected sync request (${response.status})`;
         console.warn('Sync rejected with error:', errMsg);
 
-        // Mark items as failed
-        for (const item of queue) {
+        // Flag items as failed with exact server reason
+        for (const item of pendingItems) {
           item.sync_status = 'failed';
           item.error_message = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
           await window.TimesheetDB.updateQueueItem(item);
@@ -131,11 +143,16 @@ class TimesheetSync {
     }
   }
 
-  // Discard stuck item from IndexedDB queue
+  // Discard stuck/errored item from IndexedDB queue
   async discardQueueItem(clientUuid) {
     await window.TimesheetDB.deleteQueueItem(clientUuid);
     await this.updateSyncBadgeUI();
     this.notifyStatusChange('item_discarded');
+    this.onDataSyncedCallbacks.forEach((cb) => {
+      try {
+        cb(0);
+      } catch (e) {}
+    });
     return true;
   }
 
@@ -153,18 +170,22 @@ class TimesheetSync {
     }
   }
 
-  // Fetch recent timesheets
+  // Fetch latest timesheets
   async fetchLatestTimesheets() {
     if (!navigator.onLine) {
       return await window.TimesheetDB.getCachedTimesheets();
     }
 
     try {
-      const response = await fetch('/api/method/timesheet_intelligence.api.get_my_timesheets?limit=30');
+      const response = await fetch('/api/method/timesheet_intelligence.api.get_my_timesheets?limit=50');
       if (response.ok) {
         const data = await response.json();
-        const logs = (data.message && data.message.logs) || [];
+        const msg = data.message || data;
+        const logs = msg.logs || [];
         await window.TimesheetDB.cacheTimesheets(logs);
+        if (msg.daily_summary) {
+          await window.TimesheetDB.saveCachedAggregates(msg);
+        }
         return logs;
       }
     } catch (e) {
@@ -183,10 +204,10 @@ class TimesheetSync {
 
     const counts = await window.TimesheetDB.getQueueCounts();
 
-    // 1. STATE D: Sync Error / Stuck Items (Highest Priority)
+    // 1. STATE D: Sync Error / Stuck Items (Highest Priority - Action Required)
     if (counts.failed > 0) {
       widget.className = 'appsheet-sync-pill failed';
-      widget.setAttribute('title', `${counts.failed} change${counts.failed > 1 ? 's' : ''} failed to sync. Tap to review.`);
+      widget.setAttribute('title', `${counts.failed} change${counts.failed > 1 ? 's' : ''} failed to save. Tap to resolve.`);
       widget.setAttribute('aria-label', `Sync Warning: ${counts.failed} items failed to save.`);
       if (iconEl) iconEl.textContent = '⚠️';
       if (textEl) textEl.textContent = `${counts.failed} Stuck`;
@@ -197,7 +218,7 @@ class TimesheetSync {
       return;
     }
 
-    // 2. STATE C: Syncing Active
+    // 2. STATE C: Syncing Active (Quiet Spinner)
     if (this.isSyncing) {
       widget.className = 'appsheet-sync-pill syncing';
       widget.setAttribute('title', 'Syncing changes with server...');
@@ -208,11 +229,11 @@ class TimesheetSync {
       return;
     }
 
-    // 3. STATE B: Pending Queue (Unsaved Local Changes)
+    // 3. STATE B: Pending Queue (Normal Unsaved Local Changes)
     if (counts.total > 0) {
       widget.className = 'appsheet-sync-pill pending';
-      widget.setAttribute('title', `${counts.total} unsaved change${counts.total > 1 ? 's' : ''} queued. Tap to view.`);
-      widget.setAttribute('aria-label', `${counts.total} items queued for sync.`);
+      widget.setAttribute('title', `${counts.total} unsaved change${counts.total > 1 ? 's' : ''} queued.`);
+      widget.setAttribute('aria-label', `${counts.total} items queued for background sync.`);
       if (iconEl) iconEl.textContent = '🔄';
       if (textEl) textEl.textContent = 'Queued';
       if (countEl) {

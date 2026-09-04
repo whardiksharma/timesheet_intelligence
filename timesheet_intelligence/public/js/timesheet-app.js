@@ -1,17 +1,16 @@
 /**
  * TimesheetApp: Clean, Compact, AppSheet-Grade Unified Sync Controller
  * Implements:
- * 1. Global Click & Keydown Event Delegation (100% resilient button interactivity)
- * 2. AppSheet-Style Unified Sync Indicator Widget (#appsheet-sync-widget)
- * 3. Mobile Navbar Optimization (Hides top "+ Start Work" on mobile viewports)
- * 4. Offline Queue Drawer with Conditional Discard (Discard & Retry ONLY on failed/stuck items)
+ * 1. Resilient Dual-Layer Hour Calculation (Optimistic UI reconciling Frappe server totals + local queue)
+ * 2. Frictionless Daily Breakdown Table (clean rows, zero "Queued" status clutter)
+ * 3. AppSheet-Style Error-Only Queue & Termination Drawer (Surfaces ONLY stuck/errored items)
+ * 4. Global Click & Keydown Event Delegation (100% bulletproof button interactivity)
  * 5. Automatic Session Binding to Logged-in User (frappe.session.user)
  * 6. Cross-Account Data Isolation (Purges local cache on account switch)
  * 7. Strict State Machine: Idle vs Active (Instant Unmount on Finish)
- * 8. Mandatory Accomplishment Validation Guard (Shakes input, blocks empty submissions)
+ * 8. Mandatory Accomplishment Validation Guard (Blocks empty submissions)
  * 9. Safe Page Refresh Reconstruction (No lost time on reload)
- * 10. Google Calendar-Style Monthly Attendance Overview (< Prev / Next >, KPI Badges, Date Filtering)
- * 11. Daily Breakdown Table with Clickable Row -> Frappe Desk Modal
+ * 10. Space-Efficient Google Calendar-Style Monthly Attendance Overview
  * 100% WCAG 2.2 AA Compliant.
  */
 
@@ -510,7 +509,10 @@
       await window.TimesheetDB.addToQueue(payload);
     }
 
-    // 2. Trigger Unified Sync Engine
+    // 2. Immediately update optimistic UI totals & table
+    await refreshCalendarAndTable();
+
+    // 3. Trigger Silent Unified Sync Engine
     if (window.TimesheetSync && window.TimesheetSync.drainQueue) {
       window.TimesheetSync.drainQueue();
     }
@@ -630,7 +632,7 @@
     }
   }
 
-  // 10. Daily Timesheets Breakdown Table
+  // 10. Daily Timesheets Breakdown Table (Clean, AppSheet-Style, No "Queued" Clutter)
   function renderDailyBreakdownTable(logsForDate) {
     const dailyTableTitle = document.getElementById('daily-table-title');
     const dailyTableBody = document.getElementById('daily-table-body');
@@ -699,83 +701,117 @@
     }
   }
 
+  // 11. Resilient Dual-Layer Hour Calculation (Optimistic UI Reconciler)
   async function refreshCalendarAndTable() {
     try {
       const { currentYear, currentMonth, selectedDate } = state.calendar;
+      const todayStr = new Date().toISOString().slice(0, 10);
 
-      // 1. Fetch server-aggregated calculations directly from Frappe Backend
+      // 1. Fetch offline queue items first
+      const queue = window.TimesheetDB ? await window.TimesheetDB.getQueue() : [];
+
       let backendData = null;
+      let cachedLogs = [];
+
+      // 2. Fetch fresh aggregates from Frappe Backend if online
       if (navigator.onLine) {
         try {
           const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?year=${currentYear}&month=${currentMonth}&date=${selectedDate}`);
           if (resp.ok) {
             const json = await resp.json();
             backendData = json.message || json;
+            if (backendData) {
+              if (window.TimesheetDB) {
+                await window.TimesheetDB.saveCachedAggregates(backendData);
+                if (backendData.logs) {
+                  await window.TimesheetDB.cacheTimesheets(backendData.logs);
+                }
+              }
+            }
           }
         } catch (netErr) {
-          console.warn('Network error fetching backend timesheet aggregates, falling back to local cache:', netErr);
+          console.warn('Network unreachable, falling back to local optimistic calculations:', netErr);
         }
       }
 
-      if (backendData && backendData.daily_summary) {
-        // Direct Frappe Backend Values (Single Source of Truth)
-        state.calendar.dailySummary = backendData.daily_summary || {};
-        state.calendar.monthTotalHours = Number(backendData.month_total_hours || 0);
-        state.calendar.todayTotalHours = Number(backendData.today_total_hours || 0);
-
-        // Cache latest logs
-        if (window.TimesheetDB && backendData.logs) {
-          await window.TimesheetDB.cacheTimesheets(backendData.logs);
-        }
-      } else {
-        // Offline Fallback: compute from local IndexedDB cache
-        const allLogs = window.TimesheetSync ? await window.TimesheetSync.fetchLatestTimesheets() : [];
-        const dailySummary = {};
-        let monthTotalMinutes = 0;
-        let todayTotalMinutes = 0;
-        const todayStr = new Date().toISOString().slice(0, 10);
-
-        allLogs.forEach((item) => {
-          if (!item.from_time) return;
-          const dStr = item.from_time.slice(0, 10);
-          const mins = Number(item.duration_minutes || 0);
-
-          dailySummary[dStr] = (dailySummary[dStr] || 0) + (mins / 60);
-
-          const itemDate = new Date(item.from_time);
-          if (itemDate.getFullYear() === currentYear && itemDate.getMonth() + 1 === currentMonth) {
-            monthTotalMinutes += mins;
-          }
-
-          if (dStr === todayStr) {
-            todayTotalMinutes += mins;
-          }
-        });
-
-        state.calendar.dailySummary = dailySummary;
-        state.calendar.monthTotalHours = monthTotalMinutes / 60;
-        state.calendar.todayTotalHours = todayTotalMinutes / 60;
+      // 3. Fallback to cached Frappe aggregates if offline
+      if (!backendData && window.TimesheetDB) {
+        backendData = await window.TimesheetDB.getCachedAggregates();
+        cachedLogs = await window.TimesheetDB.getCachedTimesheets();
       }
 
-      // Update KPI Badges from Frappe Calculations
+      // Base server aggregates
+      let baseDailySummary = (backendData && backendData.daily_summary) ? { ...backendData.daily_summary } : {};
+      let baseMonthTotalHours = backendData ? Number(backendData.month_total_hours || 0) : 0;
+      let baseTodayTotalHours = backendData ? Number(backendData.today_total_hours || 0) : 0;
+
+      // Base logs
+      let combinedLogs = (backendData && backendData.logs) ? [...backendData.logs] : (cachedLogs || []);
+      const existingClientUuids = new Set(combinedLogs.map((l) => l.client_uuid || l.name));
+
+      // 4. Optimistically add local pending/syncing queue items that are not yet recorded on server
+      queue.forEach((qItem) => {
+        if (!existingClientUuids.has(qItem.client_uuid)) {
+          const qDate = (qItem.from_time || '').slice(0, 10);
+          const qHours = Number(qItem.duration_minutes || 0) / 60.0;
+
+          if (qDate) {
+            baseDailySummary[qDate] = roundHours((baseDailySummary[qDate] || 0) + qHours);
+
+            if (qDate === todayStr) {
+              baseTodayTotalHours = roundHours(baseTodayTotalHours + qHours);
+            }
+
+            const qDateObj = new Date(qItem.from_time);
+            if (qDateObj.getFullYear() === currentYear && qDateObj.getMonth() + 1 === currentMonth) {
+              baseMonthTotalHours = roundHours(baseMonthTotalHours + qHours);
+            }
+          }
+
+          // Prepend to combined logs so it appears immediately in the table
+          combinedLogs.unshift({
+            name: qItem.client_uuid,
+            client_uuid: qItem.client_uuid,
+            project_name: qItem.project_name || qItem.project,
+            task: qItem.task,
+            activity_type: qItem.activity_type,
+            from_time: qItem.from_time,
+            to_time: qItem.to_time,
+            duration_minutes: qItem.duration_minutes,
+            total_hours: qItem.duration_minutes / 60.0,
+            accomplishments: qItem.accomplishments || qItem.description,
+            is_billable: qItem.is_billable,
+            sync_status: qItem.sync_status
+          });
+        }
+      });
+
+      // Update state
+      state.calendar.dailySummary = baseDailySummary;
+      state.calendar.monthTotalHours = baseMonthTotalHours;
+      state.calendar.todayTotalHours = baseTodayTotalHours;
+
+      // Update DOM KPI Badges
       const kpiTodayHours = document.getElementById('kpi-today-hours');
       const kpiMonthHours = document.getElementById('kpi-month-hours');
-      if (kpiTodayHours) kpiTodayHours.textContent = `${state.calendar.todayTotalHours.toFixed(1)} hrs`;
-      if (kpiMonthHours) kpiMonthHours.textContent = `${state.calendar.monthTotalHours.toFixed(1)} hrs`;
+      if (kpiTodayHours) kpiTodayHours.textContent = `${baseTodayTotalHours.toFixed(1)} hrs`;
+      if (kpiMonthHours) kpiMonthHours.textContent = `${baseMonthTotalHours.toFixed(1)} hrs`;
 
       renderCalendarGrid();
 
       // Filter and render daily breakdown table for selected date
-      const currentLogs = backendData && backendData.logs 
-        ? backendData.logs.filter((l) => (l.from_time || '').slice(0, 10) === selectedDate)
-        : (window.TimesheetSync ? (await window.TimesheetSync.fetchLatestTimesheets()).filter((l) => (l.from_time || '').slice(0, 10) === selectedDate) : []);
-      renderDailyBreakdownTable(currentLogs);
+      const dateLogs = combinedLogs.filter((l) => (l.from_time || '').slice(0, 10) === selectedDate);
+      renderDailyBreakdownTable(dateLogs);
     } catch (e) {
       console.warn('Error refreshing calendar and table:', e);
     }
   }
 
-  // 11. Frappe Desk Clickable Row Modal
+  function roundHours(val) {
+    return Math.round(Number(val || 0) * 100) / 100;
+  }
+
+  // 12. Frappe Desk Clickable Row Modal
   function openDetailModal(log) {
     const detailModal = document.getElementById('timesheet-detail-modal');
     const detailDeskLink = document.getElementById('detail-desk-link');
@@ -792,7 +828,7 @@
 
     if (!detailModal) return;
 
-    if (detailDeskLink && log.name) {
+    if (detailDeskLink && log.name && !log.name.startsWith('uuid_')) {
       detailDeskLink.href = `/desk/timesheet-log/${log.name}`;
       detailDeskLink.style.display = 'inline-flex';
     } else if (detailDeskLink) {
@@ -834,7 +870,7 @@
     }
   }
 
-  // 12. AppSheet-Style Unified Sync Queue Drawer Modal (With Conditional Discard)
+  // 13. AppSheet-Style Error-Only Queue & Termination Drawer Modal
   async function openSyncQueueModal() {
     const syncQueueModal = document.getElementById('sync-queue-modal');
     if (!syncQueueModal) return;
@@ -856,15 +892,22 @@
     const syncQueueListContainer = document.getElementById('sync-queue-list-container');
     const syncModalStatusBadge = document.getElementById('sync-modal-status-badge');
     const syncModalFooterCount = document.getElementById('sync-modal-footer-count');
+    const btnForceSyncNow = document.getElementById('btn-force-sync-now');
     if (!syncQueueListContainer) return;
     syncQueueListContainer.innerHTML = '';
 
     const queue = window.TimesheetDB ? await window.TimesheetDB.getQueue() : [];
     const isOnline = navigator.onLine;
 
+    // Filter ONLY for stuck / errored records
+    const failedItems = queue.filter((item) => item.sync_status === 'failed');
+
     // 1. Connection Status Badge
     if (syncModalStatusBadge) {
-      if (isOnline) {
+      if (failedItems.length > 0) {
+        syncModalStatusBadge.className = 'sync-pill failed';
+        syncModalStatusBadge.textContent = `⚠️ ${failedItems.length} Stuck Item${failedItems.length > 1 ? 's' : ''}`;
+      } else if (isOnline) {
         syncModalStatusBadge.className = 'sync-pill';
         syncModalStatusBadge.textContent = '🟢 Online (Cloud Ready)';
       } else {
@@ -873,65 +916,64 @@
       }
     }
 
-    // 2. Empty State
-    if (!queue || queue.length === 0) {
-      syncQueueListContainer.innerHTML = `
-        <div style="text-align: center; padding: 32px 16px; color: var(--text-dim);">
-          <div style="font-size: 2rem; margin-bottom: 8px;">✓</div>
-          <div style="font-weight: 700; color: var(--text-main);">All Caught Up!</div>
-          <div style="font-size: 0.82rem; margin-top: 4px;">There are no pending changes waiting to sync.</div>
-        </div>
-      `;
-      if (syncModalFooterCount) syncModalFooterCount.textContent = '0 items pending';
+    // 2. Normal Operations (No Errors): Silent and Clean View
+    if (failedItems.length === 0) {
+      if (queue.length === 0) {
+        syncQueueListContainer.innerHTML = `
+          <div style="text-align: center; padding: 36px 16px; color: var(--text-dim);">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">✓</div>
+            <div style="font-weight: 700; color: var(--text-main); font-size: 1rem;">All Synced with Cloud</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+              Your timesheet records are fully up to date on Frappe Desk.
+            </div>
+          </div>
+        `;
+        if (syncModalFooterCount) syncModalFooterCount.textContent = '0 pending changes';
+        if (btnForceSyncNow) btnForceSyncNow.style.display = 'none';
+      } else {
+        syncQueueListContainer.innerHTML = `
+          <div style="text-align: center; padding: 36px 16px; color: var(--text-dim);">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">🔄</div>
+            <div style="font-weight: 700; color: var(--text-main); font-size: 1rem;">
+              ${queue.length} Change${queue.length > 1 ? 's' : ''} Queued
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+              All changes are safely queued and will sync automatically in the background when connected.
+            </div>
+          </div>
+        `;
+        if (syncModalFooterCount) syncModalFooterCount.textContent = `${queue.length} item${queue.length > 1 ? 's' : ''} queued`;
+        if (btnForceSyncNow) {
+          btnForceSyncNow.style.display = 'inline-flex';
+          btnForceSyncNow.textContent = '🔄 Sync Now';
+        }
+      }
       return;
     }
 
+    // 3. Render ONLY Stuck / Errored Records (Action Required)
     if (syncModalFooterCount) {
-      syncModalFooterCount.textContent = `${queue.length} item${queue.length > 1 ? 's' : ''} in queue`;
+      syncModalFooterCount.textContent = `${failedItems.length} stuck record${failedItems.length > 1 ? 's' : ''} requiring review`;
     }
+    if (btnForceSyncNow) btnForceSyncNow.style.display = 'inline-flex';
 
-    // 3. Render Items
-    queue.forEach((item) => {
-      const isFailed = item.sync_status === 'failed';
-      const isSyncing = item.sync_status === 'syncing';
+    failedItems.forEach((item) => {
       const card = document.createElement('div');
-      card.className = `queue-item-card ${isFailed ? 'has-error' : ''}`;
-
-      let statusBadge = `<span class="sync-pill pending">🔄 Pending</span>`;
-      if (isFailed) {
-        statusBadge = `<span class="sync-pill failed">⚠️ Failed</span>`;
-      } else if (isSyncing) {
-        statusBadge = `<span class="sync-pill syncing">🔄 Syncing</span>`;
-      }
-
-      let errorMsgHtml = '';
-      if (isFailed && item.error_message) {
-        errorMsgHtml = `
-          <div class="queue-error-box">
-            <strong>Server Error:</strong> ${escapeHtml(item.error_message)}
-          </div>
-        `;
-      }
-
-      // APPSHEET CONDITIONAL DISCARD: Only show Discard/Retry for FAILED items!
-      let actionsHtml = '';
-      if (isFailed) {
-        actionsHtml = `
-          <div class="queue-actions-row">
-            <button type="button" class="btn-queue-discard" data-uuid="${item.client_uuid}">
-              🗑️ Discard
-            </button>
-            <button type="button" class="btn-queue-retry" data-uuid="${item.client_uuid}">
-              🔄 Retry
-            </button>
-          </div>
-        `;
-      }
+      card.className = 'queue-item-card has-error';
 
       const proj = item.project_name || item.project || 'General Operations';
       const mins = item.duration_minutes || 0;
       const fromFormatted = item.from_time ? formatTimeOnly(item.from_time) : '';
       const toFormatted = item.to_time ? formatTimeOnly(item.to_time) : '';
+
+      let errorMsgHtml = '';
+      if (item.error_message) {
+        errorMsgHtml = `
+          <div class="queue-error-box">
+            <strong>Server Rejection:</strong> ${escapeHtml(item.error_message)}
+          </div>
+        `;
+      }
 
       card.innerHTML = `
         <div class="queue-item-header">
@@ -939,16 +981,23 @@
             <div style="font-weight: 700; color: var(--text-main); font-size: 0.92rem;">${escapeHtml(proj)}</div>
             <div style="font-size: 0.78rem; color: var(--text-muted);">${mins} mins • ${fromFormatted} - ${toFormatted}</div>
           </div>
-          ${statusBadge}
+          <span class="sync-pill failed">⚠️ Sync Blocked</span>
         </div>
         ${errorMsgHtml}
-        ${actionsHtml}
+        <div class="queue-actions-row">
+          <button type="button" class="btn-queue-discard" data-uuid="${item.client_uuid}" aria-label="Permanently delete stuck record">
+            🗑️ Discard & Terminate
+          </button>
+          <button type="button" class="btn-queue-retry" data-uuid="${item.client_uuid}" aria-label="Retry syncing record">
+            🔁 Retry
+          </button>
+        </div>
       `;
       syncQueueListContainer.appendChild(card);
     });
   }
 
-  // 13. Metadata Loader
+  // 14. Metadata Loader
   async function loadMetadata() {
     const projectSelect = document.getElementById('input-project');
     const activitySelect = document.getElementById('input-activity');
@@ -1003,7 +1052,7 @@
     });
   }
 
-  // 14. Global Event Delegation (Guarantees ALL buttons work 100% of the time)
+  // 15. Global Event Delegation (Guarantees ALL buttons work 100% of the time)
   function initGlobalEventDelegation() {
     document.addEventListener('click', async (e) => {
       const target = e.target;
@@ -1202,7 +1251,7 @@
         return;
       }
 
-      // 20. Sync Queue Item Discard
+      // 20. AppSheet Error Queue Item Discard & Terminate
       const discardBtn = target.closest('.btn-queue-discard');
       if (discardBtn) {
         e.preventDefault();
@@ -1211,18 +1260,18 @@
           await window.TimesheetSync.discardQueueItem(uuid);
           await renderSyncQueueModal();
           await refreshCalendarAndTable();
-          showToast('Item discarded from offline queue', 'info');
+          showToast('✓ Stuck record permanently terminated and purged', 'success');
         }
         return;
       }
 
-      // 21. Sync Queue Item Retry
+      // 21. AppSheet Error Queue Item Retry
       const retryBtn = target.closest('.btn-queue-retry');
       if (retryBtn) {
         e.preventDefault();
         const uuid = retryBtn.getAttribute('data-uuid');
         if (uuid && window.TimesheetSync && window.TimesheetSync.retryQueueItem) {
-          showToast('Retrying sync...', 'info');
+          showToast('🔄 Retrying sync with server...', 'info');
           await window.TimesheetSync.retryQueueItem(uuid);
           await renderSyncQueueModal();
           await refreshCalendarAndTable();

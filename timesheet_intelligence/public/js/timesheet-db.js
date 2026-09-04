@@ -345,6 +345,53 @@ class TimesheetDB {
     }
   }
 
+  // --- Server Aggregates Caching (Optimistic Offline Reconciler) ---
+  async saveCachedAggregates(aggregates) {
+    try {
+      const db = await this.init();
+      if (!db || this.useFallback) {
+        localStorage.setItem('timesheet_cached_aggregates', JSON.stringify(aggregates));
+        return true;
+      }
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(['metadata'], 'readwrite');
+          const store = tx.objectStore('metadata');
+          store.put({ key: 'server_aggregates', data: aggregates, updated_at: new Date().toISOString() });
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+        } catch (e) {
+          resolve(false);
+        }
+      });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async getCachedAggregates() {
+    try {
+      const db = await this.init();
+      if (!db || this.useFallback) {
+        const raw = localStorage.getItem('timesheet_cached_aggregates');
+        return raw ? JSON.parse(raw) : null;
+      }
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(['metadata'], 'readonly');
+          const store = tx.objectStore('metadata');
+          const request = store.get('server_aggregates');
+          request.onsuccess = () => resolve(request.result ? request.result.data : null);
+          request.onerror = () => resolve(null);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
   async clearCachedTimesheets() {
     try {
       const db = await this.init();
