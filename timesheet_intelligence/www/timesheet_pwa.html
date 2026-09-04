@@ -1032,45 +1032,70 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
   
 
-/* --- Google Calendar Monthly Attendance Overview --- */
+/* --- Monthly Calendar Panel (Compact & Space Efficient) --- */
 .calendar-panel {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  margin-bottom: 24px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
 }
 
 .calendar-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
 }
 
 .calendar-nav-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .calendar-month-heading {
-  font-size: 1.15rem;
+  font-size: 0.98rem;
   font-weight: 800;
   letter-spacing: -0.01em;
-  min-width: 150px;
+  min-width: 125px;
   text-align: center;
   color: var(--text-main);
+  margin: 0;
 }
 
 .calendar-kpi-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kpi-pill-compact {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpi-pill-compact.today {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--accent-emerald);
+}
+
+.kpi-pill-compact.month {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--accent-cyan);
 }
 
 .calendar-grid-wrap {
@@ -1087,12 +1112,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: var(--bg-input);
   border-bottom: 1px solid var(--border-subtle);
   text-align: center;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .calendar-days-grid {
@@ -1104,8 +1129,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .cal-cell {
   background: var(--bg-surface);
-  min-height: 64px;
-  padding: 6px;
+  min-height: 46px;
+  padding: 3px 5px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -1443,13 +1468,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <button type="button" id="cal-today-btn" class="btn-header" style="font-size: 0.75rem; padding: 0 8px;">Today</button>
         </div>
 
-        <!-- KPI Badges -->
+        <!-- KPI Badges (Direct from Frappe Backend) -->
         <div class="calendar-kpi-group">
-          <span class="sync-pill" style="font-size: 0.8rem;">
-            Today: <strong id="kpi-today-hours" style="color: var(--accent-cyan); margin-left: 4px;">0.0 hrs</strong>
+          <span class="kpi-pill-compact today">
+            Today: <strong id="kpi-today-hours">0.0 hrs</strong>
           </span>
-          <span class="sync-pill" style="font-size: 0.8rem; background: rgba(56, 189, 248, 0.12); color: var(--accent-cyan); border-color: rgba(56, 189, 248, 0.25);">
-            Month: <strong id="kpi-month-hours" style="margin-left: 4px;">0.0 hrs</strong>
+          <span class="kpi-pill-compact month">
+            Month: <strong id="kpi-month-hours">0.0 hrs</strong>
           </span>
         </div>
       </div>

@@ -701,50 +701,75 @@
 
   async function refreshCalendarAndTable() {
     try {
-      const allLogs = window.TimesheetSync ? await window.TimesheetSync.fetchLatestTimesheets() : [];
       const { currentYear, currentMonth, selectedDate } = state.calendar;
 
-      const dailySummary = {};
-      let monthTotalMinutes = 0;
-      let todayTotalMinutes = 0;
-
-      const todayStr = new Date().toISOString().slice(0, 10);
-
-      allLogs.forEach((item) => {
-        if (!item.from_time) return;
-        const dStr = item.from_time.slice(0, 10);
-        const mins = Number(item.duration_minutes || 0);
-
-        // Daily Summary
-        dailySummary[dStr] = (dailySummary[dStr] || 0) + (mins / 60);
-
-        // Check if in current calendar month
-        const itemDate = new Date(item.from_time);
-        if (itemDate.getFullYear() === currentYear && itemDate.getMonth() + 1 === currentMonth) {
-          monthTotalMinutes += mins;
+      // 1. Fetch server-aggregated calculations directly from Frappe Backend
+      let backendData = null;
+      if (navigator.onLine) {
+        try {
+          const resp = await fetch(`/api/method/timesheet_intelligence.api.get_my_timesheets?year=${currentYear}&month=${currentMonth}&date=${selectedDate}`);
+          if (resp.ok) {
+            const json = await resp.json();
+            backendData = json.message || json;
+          }
+        } catch (netErr) {
+          console.warn('Network error fetching backend timesheet aggregates, falling back to local cache:', netErr);
         }
+      }
 
-        // Check if today
-        if (dStr === todayStr) {
-          todayTotalMinutes += mins;
+      if (backendData && backendData.daily_summary) {
+        // Direct Frappe Backend Values (Single Source of Truth)
+        state.calendar.dailySummary = backendData.daily_summary || {};
+        state.calendar.monthTotalHours = Number(backendData.month_total_hours || 0);
+        state.calendar.todayTotalHours = Number(backendData.today_total_hours || 0);
+
+        // Cache latest logs
+        if (window.TimesheetDB && backendData.logs) {
+          await window.TimesheetDB.cacheTimesheets(backendData.logs);
         }
-      });
+      } else {
+        // Offline Fallback: compute from local IndexedDB cache
+        const allLogs = window.TimesheetSync ? await window.TimesheetSync.fetchLatestTimesheets() : [];
+        const dailySummary = {};
+        let monthTotalMinutes = 0;
+        let todayTotalMinutes = 0;
+        const todayStr = new Date().toISOString().slice(0, 10);
 
-      state.calendar.dailySummary = dailySummary;
-      state.calendar.monthTotalHours = monthTotalMinutes / 60;
-      state.calendar.todayTotalHours = todayTotalMinutes / 60;
+        allLogs.forEach((item) => {
+          if (!item.from_time) return;
+          const dStr = item.from_time.slice(0, 10);
+          const mins = Number(item.duration_minutes || 0);
 
-      // Update KPIs
+          dailySummary[dStr] = (dailySummary[dStr] || 0) + (mins / 60);
+
+          const itemDate = new Date(item.from_time);
+          if (itemDate.getFullYear() === currentYear && itemDate.getMonth() + 1 === currentMonth) {
+            monthTotalMinutes += mins;
+          }
+
+          if (dStr === todayStr) {
+            todayTotalMinutes += mins;
+          }
+        });
+
+        state.calendar.dailySummary = dailySummary;
+        state.calendar.monthTotalHours = monthTotalMinutes / 60;
+        state.calendar.todayTotalHours = todayTotalMinutes / 60;
+      }
+
+      // Update KPI Badges from Frappe Calculations
       const kpiTodayHours = document.getElementById('kpi-today-hours');
       const kpiMonthHours = document.getElementById('kpi-month-hours');
-      if (kpiTodayHours) kpiTodayHours.textContent = `${state.calendar.todayTotalHours.toFixed(1)}h`;
-      if (kpiMonthHours) kpiMonthHours.textContent = `${state.calendar.monthTotalHours.toFixed(1)}h`;
+      if (kpiTodayHours) kpiTodayHours.textContent = `${state.calendar.todayTotalHours.toFixed(1)} hrs`;
+      if (kpiMonthHours) kpiMonthHours.textContent = `${state.calendar.monthTotalHours.toFixed(1)} hrs`;
 
       renderCalendarGrid();
 
-      // Filter for currently selected date
-      const logsForDate = allLogs.filter((l) => (l.from_time || '').slice(0, 10) === selectedDate);
-      renderDailyBreakdownTable(logsForDate);
+      // Filter and render daily breakdown table for selected date
+      const currentLogs = backendData && backendData.logs 
+        ? backendData.logs.filter((l) => (l.from_time || '').slice(0, 10) === selectedDate)
+        : (window.TimesheetSync ? (await window.TimesheetSync.fetchLatestTimesheets()).filter((l) => (l.from_time || '').slice(0, 10) === selectedDate) : []);
+      renderDailyBreakdownTable(currentLogs);
     } catch (e) {
       console.warn('Error refreshing calendar and table:', e);
     }
