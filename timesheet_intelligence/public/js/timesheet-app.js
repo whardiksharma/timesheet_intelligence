@@ -131,17 +131,84 @@
           }
           localStorage.setItem('timesheet_logged_user', profile.user);
 
-          // Update Top Bar User Badge
-          const userProfileBadge = document.getElementById('user-profile-badge');
-          if (userProfileBadge) {
-            userProfileBadge.textContent = `👤 ${profile.full_name || profile.user}`;
-            userProfileBadge.title = `Logged in as ${profile.user} (${profile.employee_name || 'Standard Employee'})`;
+          // Update Top Bar User Badge & Profile Menu
+          const displayName = profile.employee_name || profile.full_name || profile.user || 'User';
+          const userEmail = profile.user || '';
+          const userNameDisplay = document.getElementById('user-name-display');
+          const profileMenuName = document.getElementById('profile-menu-name');
+          const profileMenuEmail = document.getElementById('profile-menu-email');
+          const profileMenuRole = document.getElementById('profile-menu-role');
+          const profileMenuAvatar = document.getElementById('profile-menu-avatar');
+          const linkViewProfile = document.getElementById('link-view-profile');
+
+          let primaryRole = 'Employee';
+          if (profile.roles && profile.roles.length > 0) {
+            const filtered = profile.roles.filter((r) => r !== 'All' && r !== 'Guest');
+            if (filtered.includes('System Manager')) {
+              primaryRole = 'System Manager';
+            } else if (filtered.includes('Projects Manager')) {
+              primaryRole = 'Projects Manager';
+            } else if (filtered.length > 0) {
+              primaryRole = filtered[0];
+            }
+          }
+
+          if (userNameDisplay) userNameDisplay.textContent = displayName;
+          if (profileMenuName) profileMenuName.textContent = displayName;
+          if (profileMenuEmail) profileMenuEmail.textContent = userEmail;
+          if (profileMenuRole) profileMenuRole.textContent = primaryRole;
+          if (profileMenuAvatar) profileMenuAvatar.textContent = (displayName[0] || 'U').toUpperCase();
+
+          if (linkViewProfile) {
+            linkViewProfile.href = '/app/user-profile';
+            linkViewProfile.title = `Open Frappe Desk Profile for ${displayName}`;
           }
         }
       }
     } catch (e) {
       console.warn('Could not fetch user profile:', e);
     }
+  }
+
+  function toggleProfileMenu() {
+    const popover = document.getElementById('user-profile-menu');
+    const trigger = document.getElementById('user-profile-btn');
+    if (!popover) return;
+    const isClosed = popover.style.display === 'none' || !popover.style.display;
+    if (isClosed) {
+      popover.style.display = 'flex';
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    } else {
+      popover.style.display = 'none';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function closeProfileMenu() {
+    const popover = document.getElementById('user-profile-menu');
+    const trigger = document.getElementById('user-profile-btn');
+    if (popover && popover.style.display !== 'none') {
+      popover.style.display = 'none';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  async function handleLogout() {
+    showToast('🚪 Logging out...', 'info');
+    try {
+      if (window.TimesheetDB && window.TimesheetDB.clearAllUserData) {
+        await window.TimesheetDB.clearAllUserData();
+      }
+      localStorage.removeItem('timesheet_logged_user');
+      localStorage.removeItem('timesheet_active_session');
+      localStorage.removeItem('timesheet_cached_logs');
+    } catch (e) {}
+
+    try {
+      await fetch('/api/method/logout', { method: 'POST' });
+    } catch (e) {}
+
+    window.location.href = '/login';
   }
 
   // 2. Adaptive Theme Controller (Google Material 3 / Frappe Light / Obsidian Dark)
@@ -490,8 +557,8 @@
       tr.className = 'point-table-row';
       tr.setAttribute('data-id', pt.id);
       tr.innerHTML = `
-        <td class="table-time-cell" style="width: 25%;">
-          <span class="meta-pill pill-time" style="font-size: 0.74rem;">${pt.time}</span>
+        <td class="table-time-cell" style="width: 25%; white-space: nowrap;">
+          <span class="meta-pill pill-time" style="font-size: 0.74rem; white-space: nowrap; display: inline-flex;">${pt.time}</span>
         </td>
         <td class="point-text-cell" style="width: 65%; cursor: pointer;" title="Tap to expand / collapse full text">
           <div class="point-text-truncated">${escapeHtml(pt.text)}</div>
@@ -712,8 +779,8 @@
       tr.setAttribute('aria-label', `View details for ${proj}`);
 
       tr.innerHTML = `
-        <td style="width: 25%;">
-          <span class="meta-pill pill-time" style="font-size: 0.74rem;">${timeRange}</span>
+        <td style="width: 25%; white-space: nowrap;">
+          <span class="meta-pill pill-time" style="font-size: 0.74rem; white-space: nowrap; display: inline-flex;">${timeRange}</span>
         </td>
         <td style="width: 35%;">
           <div style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">${escapeHtml(proj)}</div>
@@ -724,7 +791,7 @@
             ${escapeHtml(pointsList.replace(/\n/g, ' | '))}
           </div>
         </td>
-        <td style="width: 15%; text-align: right; font-weight: 800; color: var(--accent-cyan);">
+        <td style="width: 15%; text-align: right; font-weight: 800; color: var(--accent-primary);">
           ${(mins / 60).toFixed(1)}h
         </td>
       `;
@@ -1185,6 +1252,26 @@
         closeOverflowMenu();
       }
 
+      // 7d. User Profile Menu Toggle
+      if (target.closest('#user-profile-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleProfileMenu();
+        return;
+      }
+
+      // 7e. Logout Button
+      if (target.closest('#btn-logout')) {
+        e.preventDefault();
+        await handleLogout();
+        return;
+      }
+
+      // Close profile menu on any outside click
+      if (!target.closest('.user-profile-wrapper')) {
+        closeProfileMenu();
+      }
+
       // 8. Voice Mic
       if (target.closest('#voice-mic-btn')) {
         e.preventDefault();
@@ -1401,6 +1488,7 @@
         closeDetailModal();
         closeSyncQueueModal();
         closeOverflowMenu();
+        closeProfileMenu();
       }
 
       if (e.target && e.target.id === 'manual-point-input') {

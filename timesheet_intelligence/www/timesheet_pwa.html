@@ -244,15 +244,136 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   gap: 8px;
 }
 
-/* User Profile Badge */
+/* User Profile Dropdown Component */
+.user-profile-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
 .user-profile-chip {
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--bg-surface-secondary);
   border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
+  color: var(--text-main);
   font-size: 0.78rem;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.user-profile-chip:hover {
+  background: var(--border-hover);
+  border-color: var(--border-highlight);
+}
+
+.dropdown-chevron {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.user-profile-chip[aria-expanded="true"] .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.profile-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 500;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  min-width: 230px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: popoverFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.profile-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.profile-avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-primary-container);
+  color: var(--accent-primary-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-info-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-email {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-role-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-secondary);
+  color: var(--accent-primary);
+  border: 1px solid var(--border-subtle);
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.profile-menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 4px 0;
+}
+
+.profile-link-item {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-logout-item {
+  color: var(--accent-rose) !important;
+}
+
+.profile-logout-item:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
 }
 
 /* Desktop 3-Way Segmented Theme Switcher */
@@ -728,19 +849,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 .meta-pill {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: var(--radius-pill);
   background: var(--bg-surface-elevated);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .meta-pill.pill-time {
   font-family: var(--font-mono);
-  color: var(--accent-cyan);
+  color: var(--accent-primary);
   border-color: var(--border-highlight);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .session-timer-col {
@@ -1596,8 +1723,35 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       </div>
 
       <div class="header-controls">
-        <div id="user-profile-badge" class="user-profile-chip" title="Logged in user">
-          👤 User
+        <!-- Interactive User Profile Dropdown Menu -->
+        <div class="user-profile-wrapper">
+          <button type="button" id="user-profile-btn" class="user-profile-chip" aria-haspopup="true" aria-expanded="false" aria-label="User account menu" title="User account options">
+            <span>👤</span>
+            <span id="user-name-display">Administrator</span>
+            <span class="dropdown-chevron" aria-hidden="true">▾</span>
+          </button>
+          
+          <div id="user-profile-menu" class="profile-popover" role="menu" aria-label="User account menu" style="display: none;">
+            <div class="profile-menu-header">
+              <div class="profile-avatar-circle" id="profile-menu-avatar" aria-hidden="true">👤</div>
+              <div class="profile-info-block">
+                <div class="profile-name" id="profile-menu-name">Administrator</div>
+                <div class="profile-email" id="profile-menu-email">admin@example.com</div>
+                <span class="profile-role-pill" id="profile-menu-role">System Manager</span>
+              </div>
+            </div>
+            <div class="profile-menu-divider"></div>
+            <a id="link-view-profile" href="/app/user-profile" target="_blank" rel="noopener" class="popover-item profile-link-item" role="menuitem">
+              <span style="display: flex; align-items: center; gap: 8px;">
+                <span>👤</span> <span>View Desk Profile</span>
+              </span>
+              <span style="font-size: 0.8rem; color: var(--text-dim);" aria-hidden="true">↗</span>
+            </a>
+            <div class="profile-menu-divider"></div>
+            <button type="button" id="btn-logout" class="popover-item profile-logout-item" role="menuitem">
+              <span>🚪</span> <span>Log Out</span>
+            </button>
+          </div>
         </div>
 
         <!-- Single AppSheet-Style Unified Sync Indicator Widget -->
@@ -1965,10 +2119,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <script>
     window.csrf_token = "{{ frappe.session.csrf_token if frappe.session else '' }}";
   </script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.7.0"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.7.0"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.7.0"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.7.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.8.1"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.8.1"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.8.1"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.8.1"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
