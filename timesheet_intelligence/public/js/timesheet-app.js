@@ -144,27 +144,62 @@
     }
   }
 
-  // 2. Theme Controller (Dark / Light)
+  // 2. Adaptive Theme Controller (Google Material 3 / Frappe Light / Obsidian Dark)
   function initTheme() {
-    const savedTheme = localStorage.getItem('timesheet_theme') || 'dark';
+    const savedTheme = localStorage.getItem('timesheet_theme') || 'google';
     applyTheme(savedTheme);
   }
 
   function applyTheme(theme) {
-    const themeToggleBtn = document.getElementById('theme-toggle-btn');
-    if (theme === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-      if (themeToggleBtn) themeToggleBtn.textContent = '☀️ Light';
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-      if (themeToggleBtn) themeToggleBtn.textContent = '🌙 Dark';
+    const validThemes = ['google', 'frappe', 'dark'];
+    if (!validThemes.includes(theme)) {
+      theme = 'google';
     }
+    document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('timesheet_theme', theme);
+
+    // Update Desktop Segmented Controls
+    document.querySelectorAll('.theme-tab-btn').forEach((btn) => {
+      const val = btn.getAttribute('data-theme') || btn.getAttribute('data-theme-val');
+      if (val === theme) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Update Mobile Popover Menu Items
+    document.querySelectorAll('.theme-option-btn').forEach((btn) => {
+      const val = btn.getAttribute('data-theme') || btn.getAttribute('data-theme-val');
+      if (val === theme) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
   }
 
-  function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-    applyTheme(current === 'light' ? 'dark' : 'light');
+  function toggleOverflowMenu() {
+    const popover = document.getElementById('overflow-popover-menu');
+    const trigger = document.getElementById('btn-overflow-menu');
+    if (!popover) return;
+    const isClosed = popover.style.display === 'none' || !popover.style.display;
+    if (isClosed) {
+      popover.style.display = 'flex';
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    } else {
+      popover.style.display = 'none';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function closeOverflowMenu() {
+    const popover = document.getElementById('overflow-popover-menu');
+    const trigger = document.getElementById('btn-overflow-menu');
+    if (popover && popover.style.display !== 'none') {
+      popover.style.display = 'none';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
   }
 
   // 3. Setup Modal Controls (Start / Switch)
@@ -1116,11 +1151,38 @@
         return;
       }
 
-      // 7. Theme Toggle
-      if (target.closest('#theme-toggle-btn')) {
+      // 7. Desktop Theme Tab Click
+      const themeTabBtn = target.closest('.theme-tab-btn');
+      if (themeTabBtn) {
         e.preventDefault();
-        toggleTheme();
+        const selectedTheme = themeTabBtn.getAttribute('data-theme') || themeTabBtn.getAttribute('data-theme-val');
+        if (selectedTheme) applyTheme(selectedTheme);
         return;
+      }
+
+      // 7b. Mobile Overflow Menu Toggle
+      if (target.closest('#btn-overflow-menu')) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleOverflowMenu();
+        return;
+      }
+
+      // 7c. Mobile Popover Theme Option Click
+      const themeOptBtn = target.closest('.theme-option-btn');
+      if (themeOptBtn) {
+        e.preventDefault();
+        const selectedTheme = themeOptBtn.getAttribute('data-theme') || themeOptBtn.getAttribute('data-theme-val');
+        if (selectedTheme) {
+          applyTheme(selectedTheme);
+          closeOverflowMenu();
+        }
+        return;
+      }
+
+      // Close overflow popover on any outside click
+      if (!target.closest('.mobile-overflow-wrapper')) {
+        closeOverflowMenu();
       }
 
       // 8. Voice Mic
@@ -1338,6 +1400,7 @@
         closeSetupModal();
         closeDetailModal();
         closeSyncQueueModal();
+        closeOverflowMenu();
       }
 
       if (e.target && e.target.id === 'manual-point-input') {

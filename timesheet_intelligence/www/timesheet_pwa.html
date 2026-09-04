@@ -19,23 +19,130 @@
   <style>
 
 
-:root {
+/* ==========================================================================
+   THEME PALETTES: Google Material 3 (Default), Frappe Light, Obsidian Dark
+   ========================================================================== */
+
+/* 1. GOOGLE MATERIAL 3 (Default) */
+:root,
+:root[data-theme="google"] {
+  --font-sans: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
+
+  /* Google Clean Surface Palette */
+  --bg-base: #f8fafd;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-secondary: #f0f4f9;
+  --bg-input: #f0f4f9;
+  --border-subtle: #e0e2ec;
+  --border-highlight: #0b57d0;
+  --border-hover: #c4c7c5;
+
+  /* Typography */
+  --text-main: #1f1f1f;
+  --text-muted: #444746;
+  --text-dim: #747775;
+
+  /* Google Brand Colors */
+  --accent-primary: #0b57d0;
+  --accent-primary-hover: #0842a0;
+  --accent-primary-container: #e8f0fe;
+  --accent-primary-text: #041e49;
+  --accent-cyan: #0b57d0;
+  --accent-cyan-hover: #0842a0;
+  --accent-cyan-glow: rgba(11, 87, 208, 0.12);
+  --accent-emerald: #137333;
+  --accent-emerald-glow: rgba(19, 115, 51, 0.12);
+  --accent-amber: #b06000;
+  --accent-rose: #b3261e;
+
+  /* Google Elevation */
+  --shadow-cockpit: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.24);
+  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.12);
+  --shadow-popover: 0 4px 16px rgba(60, 64, 67, 0.2), 0 2px 6px rgba(60, 64, 67, 0.15);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 9999px;
+
+  --focus-ring: 0 0 0 3px rgba(11, 87, 208, 0.35);
+}
+
+/* 2. FRAPPE FRAMEWORK */
+:root[data-theme="frappe"] {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Frappe Canvas */
+  --bg-base: #f4f5f7;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-secondary: #f8fafc;
+  --bg-input: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-highlight: #1b66c9;
+  --border-hover: #cbd5e1;
+
+  /* Typography */
+  --text-main: #171717;
+  --text-muted: #525252;
+  --text-dim: #737373;
+
+  /* Frappe Accents */
+  --accent-primary: #1b66c9;
+  --accent-primary-hover: #144fa0;
+  --accent-primary-container: #eff6ff;
+  --accent-primary-text: #1e40af;
+  --accent-cyan: #1b66c9;
+  --accent-cyan-hover: #144fa0;
+  --accent-cyan-glow: rgba(27, 102, 201, 0.12);
+  --accent-emerald: #16a34a;
+  --accent-emerald-glow: rgba(22, 163, 74, 0.12);
+  --accent-amber: #d97706;
+  --accent-rose: #dc2626;
+
+  /* Frappe Elevation */
+  --shadow-cockpit: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-popover: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  --focus-ring: 0 0 0 3px rgba(27, 102, 201, 0.3);
+}
+
+/* 3. OBSIDIAN LUXURY DARK */
+:root[data-theme="dark"] {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Obsidian Dark Theme (Default) */
+  /* Obsidian Dark */
   --bg-base: #07090e;
-  --bg-surface: rgba(15, 23, 42, 0.75);
-  --bg-surface-elevated: rgba(26, 36, 56, 0.8);
-  --bg-input: rgba(10, 15, 28, 0.9);
+  --bg-surface: rgba(15, 23, 42, 0.85);
+  --bg-surface-elevated: rgba(26, 36, 56, 0.9);
+  --bg-surface-secondary: rgba(15, 23, 42, 0.6);
+  --bg-input: rgba(10, 15, 28, 0.95);
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-highlight: rgba(56, 189, 248, 0.35);
+  --border-highlight: rgba(56, 189, 248, 0.4);
   --border-hover: rgba(255, 255, 255, 0.16);
 
+  /* Typography */
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
 
+  /* Obsidian Accents */
+  --accent-primary: #38bdf8;
+  --accent-primary-hover: #0ea5e9;
+  --accent-primary-container: rgba(56, 189, 248, 0.15);
+  --accent-primary-text: #38bdf8;
   --accent-cyan: #38bdf8;
   --accent-cyan-hover: #0ea5e9;
   --accent-cyan-glow: rgba(56, 189, 248, 0.2);
@@ -44,37 +151,18 @@
   --accent-amber: #f59e0b;
   --accent-rose: #f43f5e;
 
+  /* Dark Elevation */
+  --shadow-cockpit: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-popover: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-pill: 9999px;
 
-  --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.65);
-}
-
-:root[data-theme="light"] {
-  --bg-base: #f1f5f9;
-  --bg-surface: #ffffff;
-  --bg-surface-elevated: #f8fafc;
-  --bg-input: #ffffff;
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --border-highlight: rgba(2, 132, 199, 0.4);
-  --border-hover: rgba(0, 0, 0, 0.16);
-
-  --text-main: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #64748b;
-
-  --accent-cyan: #0284c7;
-  --accent-cyan-hover: #0369a1;
-  --accent-cyan-glow: rgba(2, 132, 199, 0.15);
-  --accent-emerald: #059669;
-  --accent-emerald-glow: rgba(5, 150, 105, 0.15);
-  --accent-amber: #b45309;
-  --accent-rose: #e11d48;
-
-  --focus-ring: 0 0 0 3px rgba(2, 132, 199, 0.5);
+  --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.5);
 }
 
 * {
@@ -131,21 +219,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 .brand-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-emerald));
+  background: var(--accent-primary-container);
+  color: var(--accent-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  color: #041325;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .brand-title {
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-main);
 }
 
 .header-controls {
@@ -154,8 +244,143 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   gap: 8px;
 }
 
+/* User Profile Badge */
+.user-profile-chip {
+  font-weight: 600;
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+/* Desktop 3-Way Segmented Theme Switcher */
+.theme-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  gap: 2px;
+}
+
+.theme-tab-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.theme-tab-btn:hover {
+  color: var(--text-main);
+}
+
+.theme-tab-btn.active {
+  background: var(--bg-surface);
+  color: var(--accent-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  font-weight: 700;
+}
+
+/* Mobile Three-Dot Overflow Menu */
+.mobile-overflow-wrapper {
+  position: relative;
+  display: none;
+}
+
+.btn-overflow-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.btn-overflow-icon:hover {
+  background: var(--border-hover);
+  border-color: var(--border-highlight);
+}
+
+.overflow-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 500;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  min-width: 175px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: popoverFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.popover-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  padding: 6px 10px 4px;
+}
+
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.popover-item:hover {
+  background: var(--bg-surface-secondary);
+}
+
+.popover-item.active {
+  background: var(--accent-primary-container);
+  color: var(--accent-primary-text);
+  font-weight: 700;
+}
+
 .btn-header {
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 12px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
@@ -1323,6 +1548,42 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   white-space: nowrap;
 }
 
+@media (max-width: 640px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .show-on-mobile {
+    display: inline-flex !important;
+  }
+  .app-header {
+    padding: 8px 12px;
+  }
+  .brand-title {
+    font-size: 0.95rem;
+  }
+  .brand-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 0.85rem;
+  }
+  .header-controls {
+    gap: 6px;
+  }
+  #main-content {
+    padding: 0 10px 80px !important;
+    margin: 12px auto !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .show-on-mobile {
+    display: none !important;
+  }
+  .hide-on-mobile {
+    display: inline-flex !important;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -1330,12 +1591,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <header class="app-header" role="banner">
     <div class="header-container">
       <div class="brand-badge">
-        <div class="brand-icon" aria-hidden="true">⚡</div>
-        <h1 class="brand-title">Timesheet</h1>
+        <div class="brand-icon" aria-hidden="true">⏱️</div>
+        <span class="brand-title">Timesheet</span>
       </div>
 
       <div class="header-controls">
-        <div id="user-profile-badge" class="sync-pill" style="font-weight: 700; background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.25); color: var(--accent-cyan);" title="Logged in user">
+        <div id="user-profile-badge" class="user-profile-chip" title="Logged in user">
           👤 User
         </div>
 
@@ -1346,11 +1607,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
           <span class="sync-count-badge" id="sync-widget-count" style="display: none;">0</span>
         </button>
 
-        <button type="button" id="theme-toggle-btn" class="btn-header" title="Toggle Light/Dark Theme" aria-label="Toggle theme">
-          🌙 Dark
-        </button>
+        <!-- Desktop 3-Theme Segmented Switcher (Extreme Right) -->
+        <div class="theme-segmented-control hide-on-mobile" id="desktop-theme-switcher" role="radiogroup" aria-label="Theme selection">
+          <button type="button" class="theme-tab-btn active" data-theme="google" title="Google Material Theme">🔵 Google</button>
+          <button type="button" class="theme-tab-btn" data-theme="frappe" title="Frappe Light Theme">⚡ Frappe</button>
+          <button type="button" class="theme-tab-btn" data-theme="dark" title="Obsidian Dark Theme">🌙 Dark</button>
+        </div>
 
-        <button type="button" id="btn-header-start" class="btn-header hide-on-mobile" style="background: var(--accent-cyan); color: #041325; font-weight: 800; border: none;">
+        <!-- Mobile Three-Dot Overflow Menu (Top-Right Corner) -->
+        <div class="mobile-overflow-wrapper show-on-mobile">
+          <button type="button" id="btn-overflow-menu" class="btn-overflow-icon" aria-label="More options" aria-haspopup="true" aria-expanded="false" title="Menu">
+            ⋮
+          </button>
+          <div id="overflow-popover-menu" class="overflow-popover" role="menu" aria-label="Theme selection menu" style="display: none;">
+            <div class="popover-header">Theme</div>
+            <button type="button" class="popover-item theme-option-btn active" data-theme="google" role="menuitem">
+              <span>🔵</span> <span>Google Material</span>
+            </button>
+            <button type="button" class="popover-item theme-option-btn" data-theme="frappe" role="menuitem">
+              <span>⚡</span> <span>Frappe Light</span>
+            </button>
+            <button type="button" class="popover-item theme-option-btn" data-theme="dark" role="menuitem">
+              <span>🌙</span> <span>Obsidian Dark</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" id="btn-header-start" class="btn-header hide-on-mobile" style="background: var(--accent-primary); color: #ffffff; font-weight: 700; border: none;">
           + Start Work
         </button>
       </div>
@@ -1518,17 +1801,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         <table class="clean-data-table" role="table">
           <thead>
             <tr>
-              <th>Project</th>
-              <th>Task / Activity</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Duration</th>
-              <th>Status</th>
+              <th style="width: 25%;">Time</th>
+              <th style="width: 35%;">Project & Activity</th>
+              <th style="width: 25%;">Accomplishments</th>
+              <th style="width: 15%; text-align: right;">Duration</th>
             </tr>
           </thead>
           <tbody id="daily-table-body">
             <tr>
-              <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-dim);">
+              <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-dim);">
                 Loading timesheets...
               </td>
             </tr>
@@ -1684,10 +1965,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <script>
     window.csrf_token = "{{ frappe.session.csrf_token if frappe.session else '' }}";
   </script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.6.2"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.6.2"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.6.2"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.6.2"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.7.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.7.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.7.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.7.0"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -4,17 +4,118 @@
  * 100% WCAG 2.1 AA Compliant (High Contrast, 48px Touch Targets, Accessible Focus Rings)
  */
 
-:root {
+/* ==========================================================================
+   THEME PALETTES: Google Material 3 (Default), Frappe Light, Obsidian Dark
+   ========================================================================== */
+
+/* 1. GOOGLE MATERIAL 3 (Default) */
+:root,
+:root[data-theme="google"] {
+  --font-sans: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
+
+  /* Google Clean Surface Palette */
+  --bg-base: #f8fafd;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-secondary: #f0f4f9;
+  --bg-input: #f0f4f9;
+  --border-subtle: #e0e2ec;
+  --border-highlight: #0b57d0;
+  --border-hover: #c4c7c5;
+
+  /* Typography */
+  --text-main: #1f1f1f;
+  --text-muted: #444746;
+  --text-dim: #747775;
+
+  /* Google Brand Colors */
+  --accent-primary: #0b57d0;
+  --accent-primary-hover: #0842a0;
+  --accent-primary-container: #e8f0fe;
+  --accent-primary-text: #041e49;
+  --accent-cyan: #0b57d0;
+  --accent-cyan-hover: #0842a0;
+  --accent-cyan-glow: rgba(11, 87, 208, 0.12);
+  --accent-emerald: #137333;
+  --accent-emerald-glow: rgba(19, 115, 51, 0.12);
+  --accent-amber: #b06000;
+  --accent-rose: #b3261e;
+
+  /* Google Elevation */
+  --shadow-cockpit: 0 1px 3px rgba(60, 64, 67, 0.12), 0 1px 2px rgba(60, 64, 67, 0.24);
+  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.08), 0 1px 3px rgba(60, 64, 67, 0.12);
+  --shadow-popover: 0 4px 16px rgba(60, 64, 67, 0.2), 0 2px 6px rgba(60, 64, 67, 0.15);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 9999px;
+
+  --focus-ring: 0 0 0 3px rgba(11, 87, 208, 0.35);
+}
+
+/* 2. FRAPPE FRAMEWORK */
+:root[data-theme="frappe"] {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Frappe Canvas */
+  --bg-base: #f4f5f7;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-secondary: #f8fafc;
+  --bg-input: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-highlight: #1b66c9;
+  --border-hover: #cbd5e1;
+
+  /* Typography */
+  --text-main: #171717;
+  --text-muted: #525252;
+  --text-dim: #737373;
+
+  /* Frappe Accents */
+  --accent-primary: #1b66c9;
+  --accent-primary-hover: #144fa0;
+  --accent-primary-container: #eff6ff;
+  --accent-primary-text: #1e40af;
+  --accent-cyan: #1b66c9;
+  --accent-cyan-hover: #144fa0;
+  --accent-cyan-glow: rgba(27, 102, 201, 0.12);
+  --accent-emerald: #16a34a;
+  --accent-emerald-glow: rgba(22, 163, 74, 0.12);
+  --accent-amber: #d97706;
+  --accent-rose: #dc2626;
+
+  /* Frappe Elevation */
+  --shadow-cockpit: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-popover: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  --focus-ring: 0 0 0 3px rgba(27, 102, 201, 0.3);
+}
+
+/* 3. OBSIDIAN LUXURY DARK */
+:root[data-theme="dark"] {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Obsidian Luxury Palette */
+  /* Obsidian Dark */
   --bg-base: #07090e;
-  --bg-surface: rgba(15, 23, 42, 0.7);
-  --bg-surface-elevated: rgba(30, 41, 59, 0.75);
-  --bg-input: rgba(10, 15, 28, 0.85);
+  --bg-surface: rgba(15, 23, 42, 0.85);
+  --bg-surface-elevated: rgba(26, 36, 56, 0.9);
+  --bg-surface-secondary: rgba(15, 23, 42, 0.6);
+  --bg-input: rgba(10, 15, 28, 0.95);
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-highlight: rgba(56, 189, 248, 0.35);
+  --border-highlight: rgba(56, 189, 248, 0.4);
   --border-hover: rgba(255, 255, 255, 0.16);
 
   /* Typography */
@@ -22,56 +123,31 @@
   --text-muted: #94a3b8;
   --text-dim: #64748b;
 
-  /* Accents */
+  /* Obsidian Accents */
+  --accent-primary: #38bdf8;
+  --accent-primary-hover: #0ea5e9;
+  --accent-primary-container: rgba(56, 189, 248, 0.15);
+  --accent-primary-text: #38bdf8;
   --accent-cyan: #38bdf8;
   --accent-cyan-hover: #0ea5e9;
-  --accent-cyan-glow: rgba(56, 189, 248, 0.25);
+  --accent-cyan-glow: rgba(56, 189, 248, 0.2);
   --accent-emerald: #10b981;
-  --accent-emerald-glow: rgba(16, 185, 129, 0.25);
+  --accent-emerald-glow: rgba(16, 185, 129, 0.2);
   --accent-amber: #f59e0b;
-  --accent-amber-glow: rgba(245, 158, 11, 0.25);
   --accent-rose: #f43f5e;
-  --accent-indigo: #6366f1;
 
-  /* Shadows & Glass */
-  --glass-blur: blur(20px) saturate(180%);
+  /* Dark Elevation */
   --shadow-cockpit: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
   --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --shadow-button: 0 4px 14px rgba(0, 0, 0, 0.3);
+  --shadow-popover: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
 
-  /* Radius */
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-pill: 9999px;
 
-  /* Focus Ring (WCAG 2.1 AA) */
-  --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.65);
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg-base: #f1f5f9;
-    --bg-surface: rgba(255, 255, 255, 0.85);
-    --bg-surface-elevated: #ffffff;
-    --bg-input: #f8fafc;
-    --border-subtle: rgba(0, 0, 0, 0.08);
-    --border-highlight: rgba(2, 132, 199, 0.4);
-    --border-hover: rgba(0, 0, 0, 0.15);
-    --text-main: #0f172a;
-    --text-muted: #475569;
-    --text-dim: #64748b;
-    --accent-cyan: #0284c7;
-    --accent-cyan-hover: #0369a1;
-    --accent-cyan-glow: rgba(2, 132, 199, 0.2);
-    --accent-emerald: #059669;
-    --accent-emerald-glow: rgba(5, 150, 105, 0.2);
-    --accent-amber: #d97706;
-    --accent-rose: #e11d48;
-    --shadow-cockpit: 0 20px 40px -15px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 10px 25px -10px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.06);
-  }
+  --focus-ring: 0 0 0 3px rgba(56, 189, 248, 0.5);
 }
 
 * {
