@@ -18,12 +18,9 @@
   // Application State
   const now = new Date();
   const state = {
-    timer: {
-      interval: null,
-      startTime: null, // timestamp in ms
-      elapsedSeconds: 0,
-      isRunning: false
-    },
+    activeSessions: [], // Array of concurrent active/draft sessions
+    finishingSessionUuid: null, // Session UUID currently open in finish modal
+    globalInterval: null,
     currentUserProfile: {
       user: 'Administrator',
       full_name: 'Administrator',
@@ -286,15 +283,31 @@
     }
   }
 
-  // 3. Setup Modal Controls (Start / Switch)
+  // 2b. Helper: Local ISO String for <input type="datetime-local">
+  function getLocalDateTimeString(dateObj) {
+    const d = dateObj || new Date();
+    const pad = (num) => String(num).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  // 3. Setup Modal Controls (Start / Track Another Task)
   function openSetupModal(mode = 'new') {
     state.modalMode = mode;
     const setupModal = document.getElementById('project-setup-modal');
     const setupModalTitle = document.getElementById('setup-modal-title');
     const btnStartSessionModal = document.getElementById('btn-start-session-modal');
     const projectSelect = document.getElementById('input-project');
+    const inputStartTime = document.getElementById('input-start-time');
 
     if (setupModal) {
+      if (inputStartTime) {
+        inputStartTime.value = getLocalDateTimeString(new Date());
+      }
       if (mode === 'switch') {
         if (setupModalTitle) setupModalTitle.textContent = 'Switch to Another Project';
         if (btnStartSessionModal) btnStartSessionModal.textContent = '🔄 Log Current & Switch Project';
@@ -318,12 +331,13 @@
     }
   }
 
-  // 4. Start or Switch Working Session
+  // 4. Start New Work Session (AppSheet Instant Row Creation)
   async function handleModalSubmit() {
     const projectSelect = document.getElementById('input-project');
     const taskSelect = document.getElementById('input-task');
     const activitySelect = document.getElementById('input-activity');
     const billableCheck = document.getElementById('input-billable');
+    const inputStartTime = document.getElementById('input-start-time');
 
     let projName = 'General Operations';
     let projId = 'PROJ-GENERAL';
@@ -340,194 +354,413 @@
     const actName = activitySelect && activitySelect.value ? activitySelect.value : 'Development';
     const isBillable = billableCheck ? billableCheck.checked : true;
 
-    // IF SWITCHING: Cleanly log and save previous project first!
-    if (state.modalMode === 'switch' && state.currentSession.project && state.timer.elapsedSeconds > 0) {
-      await saveCurrentSessionToLog(`Switched project to ${projName}`);
-      showToast(`✓ Logged previous project! Switched to ${projName}`, 'info');
+    let dtStart = new Date();
+    if (inputStartTime && inputStartTime.value) {
+      const parsed = new Date(inputStartTime.value);
+      if (!isNaN(parsed.getTime())) {
+        dtStart = parsed;
+      }
     }
 
-    const now = new Date();
-    state.currentSession = {
+    const startTimeIso = dtStart.toISOString();
+    const fromTimeStr = `${dtStart.getFullYear()}-${String(dtStart.getMonth() + 1).padStart(2, '0')}-${String(dtStart.getDate()).padStart(2, '0')} ${String(dtStart.getHours()).padStart(2, '0')}:${String(dtStart.getMinutes()).padStart(2, '0')}:${String(dtStart.getSeconds()).padStart(2, '0')}`;
+    const initialElapsed = Math.max(0, Math.floor((Date.now() - dtStart.getTime()) / 1000));
+    const clientUuid = 'uuid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
+    const newSession = {
+      client_uuid: clientUuid,
       project: projName,
       projectId: projId,
       task: taskName,
       activity: actName,
       isBillable: isBillable,
-      startTime: now.toISOString(),
+      startTime: startTimeIso,
+      from_time: fromTimeStr,
+      elapsedSeconds: initialElapsed,
+      isRunning: true,
       points: []
     };
 
-    // Update UI Elements
-    const activeProjectLabel = document.getElementById('active-project-label');
-    const activeTaskLabel = document.getElementById('active-task-label');
-    const activeActivityLabel = document.getElementById('active-activity-label');
-    const activeStartTimeLabel = document.getElementById('active-start-time-label');
-    const idleSessionCard = document.getElementById('idle-session-card');
-    const activeSessionCard = document.getElementById('active-session-card');
-
-    if (activeProjectLabel) activeProjectLabel.textContent = projName;
-    if (activeTaskLabel) activeTaskLabel.textContent = taskName || 'General Task';
-    if (activeActivityLabel) activeActivityLabel.textContent = actName;
-    if (activeStartTimeLabel) activeStartTimeLabel.textContent = `Started ${formatTimeOnly(now)}`;
-
-    // Transition State: Mount Active Card, Unmount Idle Card
-    if (idleSessionCard) idleSessionCard.style.display = 'none';
-    if (activeSessionCard) activeSessionCard.style.display = 'block';
-
-    // Clear points and start stopwatch
-    renderLivePoints();
-    resetTimer();
-    startTimer();
-
-    // Close Modal
+    state.activeSessions.push(newSession);
+    state.currentSession = newSession;
+    saveSessionsState();
+    renderActiveSessions();
     closeSetupModal();
-    saveSessionState();
 
     if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
       window.TimesheetVoice.playTone('start');
     }
     showToast(`🚀 Started: ${projName}`, 'success');
+
+    // AppSheet Real-Time Server Row Ingestion (Background)
+    try {
+      const params = new URLSearchParams({
+        client_uuid: clientUuid,
+        project_name: projName,
+        task_name: taskName,
+        activity_type: actName,
+        is_billable: isBillable ? 1 : 0,
+        from_time: fromTimeStr
+      });
+      fetch(`/api/method/timesheet_intelligence.api.start_timesheet_session?${params.toString()}`, {
+        method: 'POST',
+        headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '' }
+      }).catch((err) => {
+        console.warn('Background start_timesheet_session error (handled offline):', err);
+      });
+    } catch (e) {}
+
+    // Queue in local IndexedDB
+    if (window.TimesheetDB && window.TimesheetDB.addToQueue) {
+      window.TimesheetDB.addToQueue({
+        client_uuid: clientUuid,
+        action: 'start',
+        status: 'Draft',
+        project: projId,
+        project_name: projName,
+        task: taskName,
+        activity_type: actName,
+        is_billable: isBillable ? 1 : 0,
+        from_time: fromTimeStr,
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 
-  // 5. Timer Logic with Safe Page Refresh Reconstruction
-  function saveSessionState() {
+  // 5. Multi-Session Renderer & State Persistence
+  function saveSessionsState() {
     try {
-      localStorage.setItem('timesheet_active_session', JSON.stringify({
-        currentSession: state.currentSession,
-        timer: {
-          isRunning: state.timer.isRunning,
-          startTime: state.timer.startTime,
-          elapsedSeconds: state.timer.elapsedSeconds
-        }
-      }));
+      localStorage.setItem('timesheet_active_sessions', JSON.stringify(state.activeSessions));
     } catch (e) {}
   }
 
   function restoreSessionState() {
-    const activeProjectLabel = document.getElementById('active-project-label');
-    const activeTaskLabel = document.getElementById('active-task-label');
-    const activeActivityLabel = document.getElementById('active-activity-label');
-    const activeStartTimeLabel = document.getElementById('active-start-time-label');
-    const idleSessionCard = document.getElementById('idle-session-card');
-    const activeSessionCard = document.getElementById('active-session-card');
-    const timerDisplay = document.getElementById('timer-display');
-
-    const saved = localStorage.getItem('timesheet_active_session');
+    const saved = localStorage.getItem('timesheet_active_sessions');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.currentSession && parsed.currentSession.project) {
-          state.currentSession = parsed.currentSession;
-          if (activeProjectLabel) activeProjectLabel.textContent = state.currentSession.project;
-          if (activeTaskLabel) activeTaskLabel.textContent = state.currentSession.task || 'General Task';
-          if (activeActivityLabel) activeActivityLabel.textContent = state.currentSession.activity || 'Development';
-          if (activeStartTimeLabel && state.currentSession.startTime) {
-            activeStartTimeLabel.textContent = `Started ${formatTimeOnly(state.currentSession.startTime)}`;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          state.activeSessions = parsed;
+          state.currentSession = state.activeSessions[state.activeSessions.length - 1];
+          renderActiveSessions();
+          startGlobalTimerLoop();
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // Fallback: check legacy single session key
+    const legacy = localStorage.getItem('timesheet_active_session');
+    if (legacy) {
+      try {
+        const p = JSON.parse(legacy);
+        if (p.currentSession && p.currentSession.project) {
+          const clientUuid = 'uuid_' + Date.now();
+          state.activeSessions = [{
+            client_uuid: clientUuid,
+            project: p.currentSession.project,
+            task: p.currentSession.task,
+            activity: p.currentSession.activity,
+            isBillable: p.currentSession.isBillable,
+            startTime: p.currentSession.startTime || new Date().toISOString(),
+            from_time: p.currentSession.startTime || new Date().toISOString(),
+            elapsedSeconds: p.timer ? p.timer.elapsedSeconds : 0,
+            isRunning: p.timer ? p.timer.isRunning : true,
+            points: p.currentSession.points || []
+          }];
+          state.currentSession = state.activeSessions[0];
+          localStorage.removeItem('timesheet_active_session');
+          saveSessionsState();
+          renderActiveSessions();
+          startGlobalTimerLoop();
+          return;
+        }
+      } catch (e) {}
+    }
+
+    state.activeSessions = [];
+    renderActiveSessions();
+    startGlobalTimerLoop();
+  }
+
+  function renderActiveSessions() {
+    const container = document.getElementById('active-sessions-container');
+    const toolbar = document.getElementById('active-sessions-toolbar');
+    const countLabel = document.getElementById('active-sessions-count-label');
+    const idleCard = document.getElementById('idle-session-card');
+
+    if (!container) return;
+
+    if (state.activeSessions.length === 0) {
+      container.innerHTML = '';
+      if (toolbar) toolbar.style.display = 'none';
+      if (idleCard) idleCard.style.display = 'flex';
+      updateUserPresence(false);
+      renderLivePoints();
+      return;
+    }
+
+    if (idleCard) idleCard.style.display = 'none';
+    if (toolbar) {
+      toolbar.style.display = 'flex';
+      if (countLabel) {
+        countLabel.textContent = `${state.activeSessions.length} Active Task${state.activeSessions.length > 1 ? 's' : ''} Recording`;
+      }
+    }
+    updateUserPresence(true);
+
+    container.innerHTML = state.activeSessions.map((s) => `
+      <section class="session-card" data-session-uuid="${s.client_uuid}">
+        <div class="session-header-row">
+          <div class="session-status-badge ${s.isRunning ? 'running' : 'paused'}" id="session-status-pill-${s.client_uuid}">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <span id="session-status-label-${s.client_uuid}">${s.isRunning ? 'LIVE RECORDING' : 'PAUSED'}</span>
+          </div>
+
+          <div class="session-actions-group">
+            <button type="button" class="btn-session-action btn-pause btn-toggle-pause" data-uuid="${s.client_uuid}" style="display: ${s.isRunning ? 'inline-flex' : 'none'};" aria-label="Pause timer">
+              <span>⏸ Pause</span>
+            </button>
+            <button type="button" class="btn-session-action btn-resume btn-toggle-resume" data-uuid="${s.client_uuid}" style="display: ${!s.isRunning ? 'inline-flex' : 'none'};" aria-label="Resume timer">
+              <span>▶ Resume</span>
+            </button>
+            <button type="button" class="btn-session-action btn-finish btn-open-finish-modal" data-uuid="${s.client_uuid}" aria-label="Finish and save timesheet">
+              <span>⏹ Finish & Save</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="session-body-row">
+          <div class="session-details-col">
+            <div class="session-project-name">${escapeHtml(s.project)}</div>
+            <div class="session-meta-pills">
+              <span class="meta-pill">${escapeHtml(s.task || 'General Task')}</span>
+              <span class="meta-pill">${escapeHtml(s.activity || 'Development')}</span>
+              <span class="meta-pill pill-time">Started ${formatTimeOnly(s.startTime)}</span>
+              ${s.isBillable ? '<span class="meta-pill" style="color:var(--accent-emerald); font-weight:700;">Billable</span>' : ''}
+            </div>
+          </div>
+
+          <div class="session-timer-col">
+            <div id="timer-display-${s.client_uuid}" class="timer-digits-compact">${formatSeconds(s.elapsedSeconds)}</div>
+          </div>
+        </div>
+      </section>
+    `).join('');
+
+    renderLivePoints();
+  }
+
+  function startGlobalTimerLoop() {
+    if (state.globalInterval) clearInterval(state.globalInterval);
+    state.globalInterval = setInterval(() => {
+      const nowMs = Date.now();
+
+      state.activeSessions.forEach((s) => {
+        if (s.isRunning) {
+          const startMs = new Date(s.startTime).getTime();
+          if (!isNaN(startMs)) {
+            s.elapsedSeconds = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+          } else {
+            s.elapsedSeconds = (s.elapsedSeconds || 0) + 1;
           }
 
-          renderLivePoints();
-
-          // SAFE PAGE REFRESH RECONSTRUCTION:
-          if (parsed.timer && parsed.timer.isRunning && parsed.timer.startTime) {
-            const now = Date.now();
-            state.timer.elapsedSeconds = Math.max(1, Math.floor((now - parsed.timer.startTime) / 1000));
-            state.timer.startTime = parsed.timer.startTime;
-
-            if (idleSessionCard) idleSessionCard.style.display = 'none';
-            if (activeSessionCard) activeSessionCard.style.display = 'block';
-            startTimerLoop();
-            return;
-          } else if (parsed.timer && parsed.timer.elapsedSeconds > 0) {
-            state.timer.elapsedSeconds = parsed.timer.elapsedSeconds;
-            if (timerDisplay) timerDisplay.textContent = formatSeconds(state.timer.elapsedSeconds);
-            if (idleSessionCard) idleSessionCard.style.display = 'none';
-            if (activeSessionCard) activeSessionCard.style.display = 'block';
-            setTimerVisualState('paused');
-            return;
+          const displayEl = document.getElementById(`timer-display-${s.client_uuid}`);
+          if (displayEl) {
+            displayEl.textContent = formatSeconds(s.elapsedSeconds);
           }
         }
-      } catch (e) {
-        console.warn('Error restoring session:', e);
-      }
-    }
+      });
 
-    // Default: Idle State
-    if (idleSessionCard) idleSessionCard.style.display = 'flex';
-    if (activeSessionCard) activeSessionCard.style.display = 'none';
-  }
-
-  function setTimerVisualState(status) {
-    const timerPauseBtn = document.getElementById('timer-pause-btn');
-    const timerResumeBtn = document.getElementById('timer-resume-btn');
-    const sessionStatusPill = document.getElementById('session-status-pill');
-    const sessionStatusLabel = document.getElementById('session-status-label');
-    const timerDisplay = document.getElementById('timer-display');
-
-    if (status === 'running') {
-      if (timerPauseBtn) timerPauseBtn.style.display = 'inline-flex';
-      if (timerResumeBtn) timerResumeBtn.style.display = 'none';
-      if (sessionStatusPill) {
-        sessionStatusPill.className = 'session-status-badge running';
-        if (sessionStatusLabel) sessionStatusLabel.textContent = 'LIVE RECORDING';
-      }
-      if (timerDisplay) {
-        timerDisplay.style.color = 'var(--accent-cyan)';
-      }
-      updateUserPresence(true);
-    } else if (status === 'paused') {
-      if (timerPauseBtn) timerPauseBtn.style.display = 'none';
-      if (timerResumeBtn) timerResumeBtn.style.display = 'inline-flex';
-      if (sessionStatusPill) {
-        sessionStatusPill.className = 'session-status-badge paused';
-        if (sessionStatusLabel) sessionStatusLabel.textContent = 'PAUSED';
-      }
-      if (timerDisplay) {
-        timerDisplay.style.color = 'var(--text-muted)';
-      }
-      updateUserPresence(true);
-    }
-  }
-
-  function startTimerLoop() {
-    if (state.timer.interval) clearInterval(state.timer.interval);
-    const timerDisplay = document.getElementById('timer-display');
-    state.timer.interval = setInterval(() => {
-      state.timer.elapsedSeconds++;
-      if (timerDisplay) timerDisplay.textContent = formatSeconds(state.timer.elapsedSeconds);
-      if (state.timer.elapsedSeconds % 5 === 0) {
-        saveSessionState();
+      if (state.activeSessions.length > 0 && Math.floor(nowMs / 1000) % 5 === 0) {
+        saveSessionsState();
       }
     }, 1000);
-
-    state.timer.isRunning = true;
-    setTimerVisualState('running');
   }
 
-  function startTimer() {
-    state.timer.isRunning = true;
-    state.timer.startTime = Date.now() - state.timer.elapsedSeconds * 1000;
-    startTimerLoop();
-    saveSessionState();
+  function pauseSession(sessionUuid) {
+    const session = state.activeSessions.find((s) => s.client_uuid === sessionUuid);
+    if (!session) return;
+    session.isRunning = false;
+    saveSessionsState();
+    renderActiveSessions();
   }
 
-  function pauseTimer() {
-    state.timer.isRunning = false;
-    clearInterval(state.timer.interval);
-    state.timer.interval = null;
-    setTimerVisualState('paused');
-    saveSessionState();
+  function resumeSession(sessionUuid) {
+    const session = state.activeSessions.find((s) => s.client_uuid === sessionUuid);
+    if (!session) return;
+    session.isRunning = true;
+    saveSessionsState();
+    renderActiveSessions();
   }
 
-  function resetTimer() {
-    if (state.timer.isRunning) pauseTimer();
-    state.timer.elapsedSeconds = 0;
-    state.timer.startTime = null;
-    const timerDisplay = document.getElementById('timer-display');
-    if (timerDisplay) timerDisplay.textContent = '00:00:00';
-    saveSessionState();
+  // 6. Finish Modal with Retroactive Stop Time & Mandatory Accomplishments
+  function openFinishModal(sessionUuid) {
+    const session = state.activeSessions.find((s) => s.client_uuid === sessionUuid);
+    if (!session) return;
+
+    state.finishingSessionUuid = sessionUuid;
+    const modal = document.getElementById('finish-session-modal');
+    const projName = document.getElementById('finish-modal-project-name');
+    const taskPill = document.getElementById('finish-modal-task-pill');
+    const actPill = document.getElementById('finish-modal-activity-pill');
+    const startPill = document.getElementById('finish-modal-start-time-pill');
+    const inputStop = document.getElementById('finish-input-stop-time');
+    const textAccomplishments = document.getElementById('finish-accomplishments-text');
+
+    if (projName) projName.textContent = session.project;
+    if (taskPill) taskPill.textContent = session.task || 'General Task';
+    if (actPill) actPill.textContent = session.activity || 'Development';
+    if (startPill) startPill.textContent = `Started ${formatTimeOnly(session.startTime)}`;
+
+    const now = new Date();
+    if (inputStop) {
+      inputStop.value = getLocalDateTimeString(now);
+    }
+
+    updateFinishDurationPreview(session);
+
+    if (textAccomplishments) {
+      if (session.points && session.points.length > 0) {
+        textAccomplishments.value = session.points.map((p) => `• [${p.time}] ${p.text}`).join('\n');
+      } else {
+        textAccomplishments.value = `• Completed work deliverable on ${session.project}`;
+      }
+    }
+
+    if (modal) {
+      modal.classList.add('open');
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden', 'false');
+    }
   }
 
-  // 6. Work Accomplishments Manager
+  function updateFinishDurationPreview(session) {
+    const inputStop = document.getElementById('finish-input-stop-time');
+    const badge = document.getElementById('finish-duration-preview-badge');
+    if (!inputStop || !badge) return;
+
+    const dtStart = new Date(session.startTime);
+    let dtStop = new Date();
+    if (inputStop.value) {
+      const parsed = new Date(inputStop.value);
+      if (!isNaN(parsed.getTime())) dtStop = parsed;
+    }
+
+    let diffMins = Math.round((dtStop.getTime() - dtStart.getTime()) / 60000);
+    if (diffMins <= 0) diffMins = Math.max(1, Math.round(session.elapsedSeconds / 60));
+
+    const hrs = (diffMins / 60.0).toFixed(2);
+    badge.textContent = `Duration: ${diffMins} mins (${hrs} hrs)`;
+  }
+
+  function closeFinishModal() {
+    const modal = document.getElementById('finish-session-modal');
+    if (modal) {
+      modal.classList.remove('open');
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    state.finishingSessionUuid = null;
+  }
+
+  async function handleFinishModalSubmit() {
+    const sessionUuid = state.finishingSessionUuid;
+    const session = state.activeSessions.find((s) => s.client_uuid === sessionUuid);
+    if (!session) {
+      closeFinishModal();
+      return;
+    }
+
+    const textAccomplishments = document.getElementById('finish-accomplishments-text');
+    const inputStop = document.getElementById('finish-input-stop-time');
+
+    const desc = (textAccomplishments ? textAccomplishments.value : '').trim();
+    if (!desc) {
+      showToast('⚠️ Please document work accomplishments before finishing!', 'error');
+      if (textAccomplishments) {
+        textAccomplishments.classList.remove('input-shake');
+        void textAccomplishments.offsetWidth;
+        textAccomplishments.classList.add('input-shake');
+        textAccomplishments.focus();
+      }
+      if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
+        window.TimesheetVoice.playTone('error');
+      }
+      return;
+    }
+
+    const dtStart = new Date(session.startTime);
+    let dtStop = new Date();
+    if (inputStop && inputStop.value) {
+      const parsed = new Date(inputStop.value);
+      if (!isNaN(parsed.getTime())) dtStop = parsed;
+    }
+
+    let diffMins = Math.round((dtStop.getTime() - dtStart.getTime()) / 60000);
+    if (diffMins <= 0) diffMins = Math.max(1, Math.round(session.elapsedSeconds / 60));
+
+    const toTimeStr = `${dtStop.getFullYear()}-${String(dtStop.getMonth() + 1).padStart(2, '0')}-${String(dtStop.getDate()).padStart(2, '0')} ${String(dtStop.getHours()).padStart(2, '0')}:${String(dtStop.getMinutes()).padStart(2, '0')}:${String(dtStop.getSeconds()).padStart(2, '0')}`;
+
+    // Remove from active sessions
+    state.activeSessions = state.activeSessions.filter((s) => s.client_uuid !== sessionUuid);
+    if (state.currentSession && state.currentSession.client_uuid === sessionUuid) {
+      state.currentSession = state.activeSessions[state.activeSessions.length - 1] || null;
+    }
+    saveSessionsState();
+    closeFinishModal();
+    renderActiveSessions();
+
+    if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
+      window.TimesheetVoice.playTone('finish');
+    }
+    showToast(`✓ Logged & completed session: ${session.project}`, 'success');
+
+    // 1. Dispatch API completion
+    try {
+      const formData = new FormData();
+      formData.append('client_uuid', session.client_uuid);
+      formData.append('to_time', toTimeStr);
+      formData.append('accomplishments', desc);
+      formData.append('duration_minutes', diffMins);
+
+      fetch('/api/method/timesheet_intelligence.api.complete_timesheet_session', {
+        method: 'POST',
+        headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '' },
+        body: formData
+      }).catch((err) => {
+        console.warn('Background complete_timesheet_session error (handled offline):', err);
+      });
+    } catch (e) {}
+
+    // 2. Queue in IndexedDB for 100% offline resilience
+    if (window.TimesheetDB && window.TimesheetDB.addToQueue) {
+      await window.TimesheetDB.addToQueue({
+        client_uuid: session.client_uuid,
+        action: 'complete',
+        status: 'Completed',
+        project: session.projectId || session.project,
+        project_name: session.project,
+        task: session.task,
+        activity_type: session.activity,
+        is_billable: session.isBillable ? 1 : 0,
+        from_time: session.from_time,
+        to_time: toTimeStr,
+        duration_minutes: diffMins,
+        accomplishments: desc,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 3. Trigger unified sync engine and refresh calendar
+    if (window.TimesheetSync && window.TimesheetSync.drainQueue) {
+      window.TimesheetSync.drainQueue();
+    }
+
+    await refreshCalendarAndTable();
+  }
+
+  // 7. Work Accomplishments Manager
   function addPoint(text) {
     if (!text || !text.trim()) return;
     const cleanText = text.trim();
@@ -539,9 +772,18 @@
       text: cleanText
     };
 
-    state.currentSession.points.push(newPoint);
+    if (state.activeSessions.length > 0) {
+      const active = state.activeSessions[state.activeSessions.length - 1];
+      if (!active.points) active.points = [];
+      active.points.push(newPoint);
+      saveSessionsState();
+    } else {
+      if (!state.currentSession) state.currentSession = { points: [] };
+      if (!state.currentSession.points) state.currentSession.points = [];
+      state.currentSession.points.push(newPoint);
+    }
+
     renderLivePoints();
-    saveSessionState();
 
     if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
       window.TimesheetVoice.playTone('save');
@@ -555,7 +797,15 @@
     if (!tableBody) return;
     tableBody.innerHTML = '';
 
-    const pts = state.currentSession.points || [];
+    let pts = [];
+    if (state.activeSessions.length > 0) {
+      state.activeSessions.forEach((s) => {
+        if (s.points) pts = pts.concat(s.points);
+      });
+    } else if (state.currentSession && state.currentSession.points) {
+      pts = state.currentSession.points;
+    }
+
     if (pointsCounter) {
       pointsCounter.textContent = `${pts.length} Point${pts.length === 1 ? '' : 's'} Logged`;
     }
@@ -588,117 +838,6 @@
       `;
       tableBody.appendChild(tr);
     });
-  }
-
-  // 7. Save Current Session: Bind Logged-in User Profile Automatically
-  async function saveCurrentSessionToLog(customDefaultDesc = '') {
-    const now = new Date();
-    const fromTime = state.currentSession.startTime || new Date(now.getTime() - Math.max(1, state.timer.elapsedSeconds) * 1000).toISOString();
-    const toTime = now.toISOString();
-    const durationMinutes = Math.max(1, Math.round(state.timer.elapsedSeconds / 60));
-
-    let description = '';
-    if (state.currentSession.points && state.currentSession.points.length > 0) {
-      description = state.currentSession.points.map((p) => `• [${p.time}] ${p.text}`).join('\n');
-    } else {
-      description = customDefaultDesc || `Completed work on ${state.currentSession.project || 'General Operations'}`;
-    }
-
-    const payload = {
-      client_uuid: 'uuid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
-      user: state.currentUserProfile.user || 'Administrator',
-      employee: state.currentUserProfile.employee_id || state.currentUserProfile.employee_name || 'Administrator',
-      employee_name: state.currentUserProfile.employee_name || state.currentUserProfile.full_name || 'Administrator',
-      project: state.currentSession.projectId || state.currentSession.project,
-      project_name: state.currentSession.project,
-      task: state.currentSession.task,
-      activity_type: state.currentSession.activity,
-      is_billable: state.currentSession.isBillable ? 1 : 0,
-      from_time: fromTime,
-      to_time: toTime,
-      duration_minutes: durationMinutes,
-      accomplishments: description,
-      description: description,
-      timestamp: now.toISOString(),
-      sync_status: 'pending',
-      error_message: null,
-      retry_count: 0
-    };
-
-    // 1. Add to Offline Mutation Queue in IndexedDB
-    if (window.TimesheetDB && window.TimesheetDB.addToQueue) {
-      await window.TimesheetDB.addToQueue(payload);
-    }
-
-    // 2. Immediately update optimistic UI totals & table
-    await refreshCalendarAndTable();
-
-    // 3. Trigger Silent Unified Sync Engine
-    if (window.TimesheetSync && window.TimesheetSync.drainQueue) {
-      window.TimesheetSync.drainQueue();
-    }
-  }
-
-  // 8. Finish Working Session & Instant Unmount (Client-Side Accomplishment Guard)
-  async function finishSessionAndUnmount() {
-    const manualPointInput = document.getElementById('manual-point-input');
-    const idleSessionCard = document.getElementById('idle-session-card');
-    const activeSessionCard = document.getElementById('active-session-card');
-
-    // Auto-capture unsaved draft in input box
-    if (manualPointInput && manualPointInput.value.trim()) {
-      addPoint(manualPointInput.value.trim());
-      manualPointInput.value = '';
-    }
-
-    // MANDATORY ACCOMPLISHMENT VALIDATION GUARD:
-    const pointsCount = (state.currentSession.points || []).length;
-    if (pointsCount === 0) {
-      showToast('⚠️ Please log at least 1 work accomplishment before finishing!', 'error');
-
-      if (manualPointInput) {
-        manualPointInput.classList.remove('input-shake');
-        void manualPointInput.offsetWidth; // Force reflow
-        manualPointInput.classList.add('input-shake');
-        manualPointInput.focus();
-      }
-
-      if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
-        window.TimesheetVoice.playTone('error');
-      }
-      return;
-    }
-
-    pauseTimer();
-    const projName = state.currentSession.project;
-
-    await saveCurrentSessionToLog();
-
-    // Reset session in state
-    state.currentSession = {
-      project: '',
-      projectId: '',
-      task: '',
-      activity: 'Development',
-      isBillable: true,
-      startTime: null,
-      points: []
-    };
-    resetTimer();
-    localStorage.removeItem('timesheet_active_session');
-    updateUserPresence(false);
-
-    // Instant Unmount to Idle Card
-    if (activeSessionCard) activeSessionCard.style.display = 'none';
-    if (idleSessionCard) idleSessionCard.style.display = 'flex';
-    renderLivePoints();
-
-    if (window.TimesheetVoice && window.TimesheetVoice.playTone) {
-      window.TimesheetVoice.playTone('finish');
-    }
-    showToast(`✓ Logged & saved session: ${projName}`, 'success');
-
-    await refreshCalendarAndTable();
   }
 
   // 9. Calendar Navigation Engine
@@ -1292,8 +1431,12 @@
       const target = e.target;
       if (!target) return;
 
-      // 1. Start Work Buttons
-      if (target.closest('#btn-start-new-session') || target.closest('#btn-header-start')) {
+      // 1. Start Work Buttons (Idle card, top header, or multi-session toolbar)
+      if (
+        target.closest('#btn-start-new-session') ||
+        target.closest('#btn-header-start') ||
+        target.closest('#btn-start-another-session')
+      ) {
         e.preventDefault();
         openSetupModal('new');
         return;
@@ -1320,22 +1463,43 @@
         return;
       }
 
-      // 5. Timer Controls
-      if (target.closest('#timer-pause-btn')) {
+      // 5. Multi-Session Timer Controls (Pause / Resume)
+      const pauseBtn = target.closest('.btn-toggle-pause') || target.closest('#timer-pause-btn');
+      if (pauseBtn) {
         e.preventDefault();
-        pauseTimer();
-        return;
-      }
-      if (target.closest('#timer-resume-btn')) {
-        e.preventDefault();
-        startTimer();
+        const uuid = pauseBtn.getAttribute('data-uuid') || (state.activeSessions[0] ? state.activeSessions[0].client_uuid : null);
+        if (uuid) pauseSession(uuid);
         return;
       }
 
-      // 6. Finish & Save Session
-      if (target.closest('#btn-finish-and-next')) {
+      const resumeBtn = target.closest('.btn-toggle-resume') || target.closest('#timer-resume-btn');
+      if (resumeBtn) {
         e.preventDefault();
-        await finishSessionAndUnmount();
+        const uuid = resumeBtn.getAttribute('data-uuid') || (state.activeSessions[0] ? state.activeSessions[0].client_uuid : null);
+        if (uuid) resumeSession(uuid);
+        return;
+      }
+
+      // 6. Open Finish Modal for Active Session
+      const finishBtn = target.closest('.btn-open-finish-modal') || target.closest('#btn-finish-and-next');
+      if (finishBtn) {
+        e.preventDefault();
+        const uuid = finishBtn.getAttribute('data-uuid') || (state.activeSessions[0] ? state.activeSessions[0].client_uuid : null);
+        if (uuid) openFinishModal(uuid);
+        return;
+      }
+
+      // 6b. Close Finish Modal
+      if (target.closest('#finish-modal-close') || target.closest('#btn-cancel-finish-modal')) {
+        e.preventDefault();
+        closeFinishModal();
+        return;
+      }
+
+      // 6c. Confirm Finish & Save Timesheet
+      if (target.closest('#btn-confirm-finish-session')) {
+        e.preventDefault();
+        await handleFinishModalSubmit();
         return;
       }
 
@@ -1419,9 +1583,15 @@
         e.preventDefault();
         e.stopPropagation();
         const id = delPointBtn.getAttribute('data-id');
-        state.currentSession.points = (state.currentSession.points || []).filter((p) => p.id !== id);
+        if (state.activeSessions.length > 0) {
+          state.activeSessions.forEach((s) => {
+            if (s.points) s.points = s.points.filter((p) => p.id !== id);
+          });
+          saveSessionsState();
+        } else if (state.currentSession && state.currentSession.points) {
+          state.currentSession.points = state.currentSession.points.filter((p) => p.id !== id);
+        }
         renderLivePoints();
-        saveSessionState();
         showToast('Point removed', 'info');
         return;
       }
@@ -1473,16 +1643,16 @@
 
         state.calendar.selectedDate = clickedDate;
 
-        // 1. Instant 0ms Visual Selection Switch
+        // Instant 0ms Visual Selection Switch
         document.querySelectorAll('.cal-cell').forEach((c) => {
           c.classList.remove('is-selected', 'selected');
         });
         calCell.classList.add('is-selected', 'selected');
 
-        // 2. Instant Local Table Render from Cached DB (0ms response)
+        // Instant Local Table Render from Cached DB (0ms response)
         renderDailyTableFromCache(clickedDate);
 
-        // 3. Background Sync & Metrics Refresh
+        // Background Sync & Metrics Refresh
         refreshCalendarAndTable();
         return;
       }
@@ -1607,7 +1777,7 @@
       }
 
       // 23. Modal Backdrop Click (click outside modal sheet)
-      ['project-setup-modal', 'timesheet-detail-modal', 'sync-queue-modal'].forEach((mId) => {
+      ['project-setup-modal', 'finish-session-modal', 'timesheet-detail-modal', 'sync-queue-modal'].forEach((mId) => {
         const modalEl = document.getElementById(mId);
         if (modalEl && target === modalEl) {
           modalEl.classList.remove('open');
@@ -1616,10 +1786,21 @@
       });
     });
 
+    // Dynamic Live Stop Time Duration Preview
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.id === 'finish-input-stop-time') {
+        const session = state.activeSessions.find((s) => s.client_uuid === state.finishingSessionUuid);
+        if (session) {
+          updateFinishDurationPreview(session);
+        }
+      }
+    });
+
     // Keyboard Shortcuts & Enter Handler
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeSetupModal();
+        closeFinishModal();
         closeDetailModal();
         closeSyncQueueModal();
         closeOverflowMenu();

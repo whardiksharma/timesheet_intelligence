@@ -1905,52 +1905,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <!-- Main Container -->
   <main id="main-content" style="max-width: 900px; margin: 20px auto; padding: 0 16px 80px;">
 
-    <!-- 1. COMPACT UNIFIED ACTIVE SESSION CARD (Mounted ONLY when timer is running/paused, completely unmounted on Finish) -->
-    <section class="session-card" id="active-session-card" style="display: none;">
-      <div class="session-header-row">
-        <div class="session-status-badge running" id="session-status-pill">
-          <span class="pulse-dot" aria-hidden="true"></span>
-          <span id="session-status-label">LIVE RECORDING</span>
-        </div>
+    <!-- 1. COMPACT UNIFIED ACTIVE SESSIONS CONTAINER (Supports Concurrent Multi-Session Tracking) -->
+    <div id="active-sessions-container" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+      <!-- Active session cards dynamically mounted here -->
+    </div>
 
-        <div class="session-actions-group">
-          <!-- PAUSE BUTTON: Shown when running -->
-          <button type="button" id="timer-pause-btn" class="btn-session-action btn-pause" aria-label="Pause live timer">
-            <span>⏸ Pause</span>
-          </button>
-
-          <!-- RESUME BUTTON: Shown when paused -->
-          <button type="button" id="timer-resume-btn" class="btn-session-action btn-resume" style="display: none;" aria-label="Resume timer">
-            <span>▶ Resume</span>
-          </button>
-
-          <!-- SWITCH PROJECT BUTTON -->
-          <button type="button" id="btn-change-project" class="btn-header" style="padding: 0 12px;" title="Switch to another project">
-            ⚙️ Switch
-          </button>
-
-          <!-- FINISH & SAVE BUTTON (Unmounts this card immediately!) -->
-          <button type="button" id="btn-finish-and-next" class="btn-session-action btn-finish" aria-label="Finish and save timesheet">
-            <span>⏹ Finish & Save</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="session-body-row">
-        <div class="session-details-col">
-          <div class="session-project-name" id="active-project-label">General Operations</div>
-          <div class="session-meta-pills">
-            <span class="meta-pill" id="active-task-label">General Task</span>
-            <span class="meta-pill" id="active-activity-label">Development</span>
-            <span class="meta-pill pill-time" id="active-start-time-label">Started 02:10 AM</span>
-          </div>
-        </div>
-
-        <div class="session-timer-col">
-          <div id="timer-display" class="timer-digits-compact">00:00:00</div>
-        </div>
-      </div>
-    </section>
+    <!-- Active Session Controls (Visible when at least 1 session active) -->
+    <div id="active-sessions-toolbar" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 4px;">
+      <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;" id="active-sessions-count-label">1 Active Session</span>
+      <button type="button" id="btn-start-another-session" class="btn-header" style="background: var(--accent-primary-container); color: var(--accent-primary); border-color: var(--border-highlight); font-weight: 700;">
+        + Track Another Task
+      </button>
+    </div>
 
     <!-- 2. IDLE STATE CARD (Visible ONLY when no active session is running) -->
     <section class="idle-card" id="idle-session-card">
@@ -2121,6 +2087,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         </select>
       </div>
 
+      <div class="form-group">
+        <label for="input-start-time" class="form-label">Start Time (Retroactive / Backdated adjustment)</label>
+        <input type="datetime-local" id="input-start-time" class="form-select" style="font-family: inherit;">
+      </div>
+
       <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
         <input type="checkbox" id="input-billable" checked style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
         <label for="input-billable" style="font-size: 0.9rem; font-weight: 600; cursor: pointer;">Client Billable</label>
@@ -2129,6 +2100,54 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <button type="button" id="btn-start-session-modal" class="btn-submit-modal">
         🚀 Start Work Session
       </button>
+    </div>
+  </div>
+
+  <!-- FINISH & SAVE TIMESHEET MODAL (Retroactive stop time & accomplishments) -->
+  <div id="finish-session-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="finish-modal-title" style="display: none;">
+    <div class="modal-sheet" style="max-width: 580px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="finish-modal-title" style="font-size: 1.2rem; font-weight: 800;">Finish & Save Timesheet</h3>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
+            Review your stop time and accomplishments before finalizing.
+          </p>
+        </div>
+        <button type="button" id="finish-modal-close" class="btn-header" style="min-height:32px; padding:0 8px;">✕</button>
+      </div>
+
+      <div style="background: var(--bg-surface); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 12px;">
+        <div style="font-size: 0.75rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase;">Project / Task</div>
+        <div id="finish-modal-project-name" style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-top: 2px;">General Operations</div>
+        <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+          <span id="finish-modal-task-pill" class="meta-pill">General Task</span>
+          <span id="finish-modal-activity-pill" class="meta-pill">Development</span>
+          <span id="finish-modal-start-time-pill" class="meta-pill pill-time">Started --:--</span>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="finish-input-stop-time" class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Stop Time (Retroactive adjustment) *</span>
+          <span id="finish-duration-preview-badge" class="meta-pill pill-time" style="font-size: 0.78rem;">Duration: 0 mins (0.00 hrs)</span>
+        </label>
+        <input type="datetime-local" id="finish-input-stop-time" class="form-select" required style="font-family: inherit;">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label for="finish-accomplishments-text" class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Work Accomplishments *</span>
+          <span style="font-size: 0.75rem; color: var(--accent-rose); font-weight: 600;">Mandatory</span>
+        </label>
+        <textarea id="finish-accomplishments-text" rows="4" placeholder="• [Time] Work completed... Describe deliverables and accomplishments" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-input); color: var(--text-main); font-family: inherit; font-size: 0.88rem; line-height: 1.5; resize: vertical; box-sizing: border-box;"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button type="button" id="btn-cancel-finish-modal" class="btn-header">Cancel</button>
+        <button type="button" id="btn-confirm-finish-session" class="btn-submit-modal" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; font-weight: 700; width: auto; padding: 0 20px;">
+          ✅ Complete & Save Timesheet
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2228,10 +2247,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <script>
     window.csrf_token = "{{ frappe.session.csrf_token if frappe.session else '' }}";
   </script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.8.3"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.8.3"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.8.3"></script>
-  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.8.3"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-db.js?v=4.9.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-sync.js?v=4.9.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-voice.js?v=4.9.0"></script>
+  <script src="/assets/timesheet_intelligence/js/timesheet-app.js?v=4.9.0"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

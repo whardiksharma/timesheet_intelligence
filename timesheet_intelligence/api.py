@@ -150,12 +150,173 @@ def get_offline_bundle():
 	}
 
 @frappe.whitelist()
+def start_timesheet_session(client_uuid=None, project_name=None, task_name=None, activity_type=None, from_time=None, is_billable=1):
+	"""
+	Immediate AppSheet-grade row creation for a live or backdated timesheet session.
+	Writes a persistent 'Draft' row to tabTimesheet Log with 0 duration.
+	"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
+	session_user = frappe.session.user
+	emp = get_current_employee(session_user)
+
+	if not client_uuid:
+		client_uuid = f"uuid_{frappe.generate_hash(length=12)}"
+
+	# 1. Idempotency Check: if row already exists with this client_uuid, return it
+	existing = frappe.db.get_value(
+		"Timesheet Log",
+		{"client_uuid": client_uuid},
+		["name", "status", "from_time", "project_name", "task_name", "activity_type", "is_billable"],
+		as_dict=True
+	)
+	if existing:
+		return {
+			"status": "success",
+			"client_uuid": client_uuid,
+			"docname": existing.name,
+			"session_status": existing.status,
+			"from_time": str(existing.from_time),
+			"project_name": existing.project_name,
+			"task_name": existing.task_name,
+			"activity_type": existing.activity_type,
+			"is_billable": existing.is_billable
+		}
+
+	try:
+		dt_from = get_datetime(from_time) if from_time else now_datetime()
+	except Exception:
+		dt_from = now_datetime()
+
+	from_time_str = dt_from.strftime("%Y-%m-%d %H:%M:%S")
+
+	doc = frappe.get_doc({
+		"doctype": "Timesheet Log",
+		"client_uuid": client_uuid,
+		"project_name": project_name or "General Operations",
+		"task_name": task_name or "",
+		"activity_type": activity_type or "Development",
+		"employee_name": emp["employee_name"],
+		"user": session_user,
+		"status": "Draft",
+		"is_billable": 1 if is_billable in [1, True, "1", "true", "Billable", "Fully Billed"] else 0,
+		"from_time": from_time_str,
+		"duration_minutes": 0,
+		"total_hours": 0.0,
+		"accomplishments": ""
+	})
+	doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"client_uuid": client_uuid,
+		"docname": doc.name,
+		"session_status": "Draft",
+		"from_time": from_time_str,
+		"project_name": doc.project_name,
+		"task_name": doc.task_name,
+		"activity_type": doc.activity_type,
+		"is_billable": doc.is_billable
+	}
+
+@frappe.whitelist()
+def complete_timesheet_session(client_uuid=None, docname=None, to_time=None, accomplishments=None, duration_minutes=None):
+	"""
+	Finalizes a Draft timesheet session with retroactive stop time and mandatory accomplishments.
+	Updates status to 'Completed'.
+	"""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Authentication required. Please log in to access your timesheet."), frappe.PermissionError)
+
+	session_user = frappe.session.user
+	emp = get_current_employee(session_user)
+
+	if not client_uuid and not docname:
+		frappe.throw(_("Missing client_uuid or docname."))
+
+	doc = None
+	if client_uuid:
+		existing_name = frappe.db.get_value("Timesheet Log", {"client_uuid": client_uuid}, "name")
+		if existing_name:
+			doc = frappe.get_doc("Timesheet Log", existing_name)
+	if not doc and docname:
+		if frappe.db.exists("Timesheet Log", docname):
+			doc = frappe.get_doc("Timesheet Log", docname)
+
+	# Permission guard
+	roles = frappe.get_roles(session_user)
+	is_manager = bool("System Manager" in roles or "HR Manager" in roles or "Projects Manager" in roles or session_user == "Administrator")
+
+	clean_desc = (accomplishments or "").strip()
+	if not clean_desc:
+		frappe.throw(_("Accomplishments cannot be empty. Please document what was completed."))
+
+	try:
+		dt_to = get_datetime(to_time) if to_time else now_datetime()
+	except Exception:
+		dt_to = now_datetime()
+
+	to_time_str = dt_to.strftime("%Y-%m-%d %H:%M:%S")
+
+	if doc:
+		if not is_manager and doc.user != session_user and doc.owner != session_user:
+			frappe.throw(_("Permission Denied: You cannot modify timesheets for another employee."))
+
+		dt_from = get_datetime(doc.from_time) if doc.from_time else dt_to
+		if dt_to < dt_from:
+			duration = max(1.0, float(duration_minutes or 1))
+		else:
+			diff_mins = (dt_to - dt_from).total_seconds() / 60.0
+			duration = float(duration_minutes) if (duration_minutes is not None and float(duration_minutes) > 0) else max(1.0, round(diff_mins, 1))
+
+		doc.to_time = to_time_str
+		doc.duration_minutes = duration
+		doc.total_hours = round(duration / 60.0, 2)
+		doc.accomplishments = clean_desc
+		doc.status = "Completed"
+		doc.save(ignore_permissions=True)
+	else:
+		# If doc didn't exist previously, insert as Completed directly
+		dt_from = dt_to
+		duration = max(1.0, float(duration_minutes or 1))
+		doc = frappe.get_doc({
+			"doctype": "Timesheet Log",
+			"client_uuid": client_uuid or f"uuid_{frappe.generate_hash(length=12)}",
+			"project_name": "General Operations",
+			"task_name": "",
+			"activity_type": "Development",
+			"employee_name": emp["employee_name"],
+			"user": session_user,
+			"status": "Completed",
+			"is_billable": 1,
+			"from_time": dt_from.strftime("%Y-%m-%d %H:%M:%S"),
+			"to_time": to_time_str,
+			"duration_minutes": duration,
+			"total_hours": round(duration / 60.0, 2),
+			"accomplishments": clean_desc
+		})
+		doc.insert(ignore_permissions=True)
+
+	frappe.db.commit()
+
+	return {
+		"status": "success",
+		"docname": doc.name,
+		"client_uuid": doc.client_uuid,
+		"total_hours": doc.total_hours,
+		"duration_minutes": doc.duration_minutes,
+		"status_label": doc.status
+	}
+
+@frappe.whitelist()
 def sync_offline_queue(queue=None):
 	"""
 	AppSheet-grade idempotent batch ingestion endpoint for offline mutations queued in client IndexedDB.
 	Guarantees:
 	1. Strict FIFO sequential processing.
-	2. Idempotency Check via client_uuid (prevents duplicate records on retries/reconnections).
+	2. Idempotency & Upsert Check via client_uuid (Draft session starts or Completed session finishes).
 	3. MariaDB Savepoint Isolation: A single failed row rolls back ONLY its own savepoint, allowing valid rows in the batch to commit cleanly.
 	4. Returns structured per-item results with exact server error reasons for failed items.
 	"""
@@ -191,10 +352,12 @@ def sync_offline_queue(queue=None):
 			continue
 
 		client_uuid = item.get("client_uuid") or item.get("id") or frappe.generate_hash(length=12)
+		action = item.get("action") or ("start" if item.get("status") == "Draft" else "complete")
 		project_name = item.get("project_name") or item.get("project") or "General Operations"
 		task_name = item.get("task_name") or item.get("task") or ""
 		activity_type = item.get("activity_type") or "Development"
 		is_billable = 1 if item.get("is_billable") in [1, True, "1", "true", "Billable", "Fully Billed"] else 0
+		status = item.get("status") or ("Draft" if action == "start" else "Completed")
 
 		from_time_raw = item.get("from_time")
 		to_time_raw = item.get("to_time")
@@ -211,67 +374,104 @@ def sync_offline_queue(queue=None):
 		from_time = dt_from.strftime("%Y-%m-%d %H:%M:%S")
 		to_time = dt_to.strftime("%Y-%m-%d %H:%M:%S")
 		duration_minutes = float(item.get("duration_minutes") or 0)
-
-		if duration_minutes <= 0:
-			diff = (dt_to - dt_from).total_seconds() / 60.0
-			duration_minutes = max(1.0, round(diff, 1))
-
-		total_hours = round(duration_minutes / 60.0, 2)
 		description = (item.get("accomplishments") or item.get("description") or item.get("notes") or "").strip()
 
-		# 1. IDEMPOTENCY GUARD: Check if already committed
-		existing = frappe.db.get_value("Timesheet Log", {"client_uuid": client_uuid}, "name")
-		if existing:
-			processed_ids.append(client_uuid)
-			results.append({
-				"client_uuid": client_uuid,
-				"status": "synced",
-				"server_name": existing,
-				"message": "Already committed"
-			})
-			continue
-
-		# 2. SAVEPOINT ISOLATION: Isolate each row insertion inside its own MariaDB savepoint
+		# SAVEPOINT ISOLATION: Isolate each row mutation inside its own MariaDB savepoint
 		clean_uuid_tag = client_uuid.replace("-", "_").replace(" ", "_")[:12]
 		savepoint_name = f"sp_{clean_uuid_tag}_{idx}"
 		frappe.db.savepoint(savepoint_name)
 
 		try:
-			# Validate accomplishment content
-			if not description:
-				frappe.throw(_("Accomplishments cannot be empty. Please document what was completed."))
+			existing_name = frappe.db.get_value("Timesheet Log", {"client_uuid": client_uuid}, "name")
 
-			ts_log_doc = frappe.get_doc({
-				"doctype": "Timesheet Log",
-				"client_uuid": client_uuid,
-				"project_name": project_name,
-				"task_name": task_name,
-				"activity_type": activity_type,
-				"employee_name": emp["employee_name"],
-				"user": session_user,
-				"status": "Completed",
-				"is_billable": is_billable,
-				"from_time": from_time,
-				"to_time": to_time,
-				"duration_minutes": duration_minutes,
-				"total_hours": total_hours,
-				"accomplishments": description
-			})
-			ts_log_doc.insert(ignore_permissions=True)
+			if status == "Draft":
+				if existing_name:
+					# Already created as draft
+					processed_ids.append(client_uuid)
+					results.append({
+						"client_uuid": client_uuid,
+						"status": "synced",
+						"server_name": existing_name,
+						"message": "Draft already exists"
+					})
+					continue
+				else:
+					doc = frappe.get_doc({
+						"doctype": "Timesheet Log",
+						"client_uuid": client_uuid,
+						"project_name": project_name,
+						"task_name": task_name,
+						"activity_type": activity_type,
+						"employee_name": emp["employee_name"],
+						"user": session_user,
+						"status": "Draft",
+						"is_billable": is_billable,
+						"from_time": from_time,
+						"duration_minutes": 0,
+						"total_hours": 0.0,
+						"accomplishments": ""
+					})
+					doc.insert(ignore_permissions=True)
+					processed_ids.append(client_uuid)
+					results.append({
+						"client_uuid": client_uuid,
+						"status": "synced",
+						"server_name": doc.name
+					})
+			else:
+				# Completed session
+				if not description:
+					frappe.throw(_("Accomplishments cannot be empty when completing a timesheet session."))
 
-			processed_ids.append(client_uuid)
-			results.append({
-				"client_uuid": client_uuid,
-				"status": "synced",
-				"server_name": ts_log_doc.name
-			})
+				if duration_minutes <= 0:
+					diff = (dt_to - dt_from).total_seconds() / 60.0
+					duration_minutes = max(1.0, round(diff, 1))
+
+				total_hours = round(duration_minutes / 60.0, 2)
+
+				if existing_name:
+					frappe.db.set_value("Timesheet Log", existing_name, {
+						"to_time": to_time,
+						"duration_minutes": duration_minutes,
+						"total_hours": total_hours,
+						"accomplishments": description,
+						"status": "Completed"
+					}, update_modified=True)
+					processed_ids.append(client_uuid)
+					results.append({
+						"client_uuid": client_uuid,
+						"status": "synced",
+						"server_name": existing_name
+					})
+				else:
+					doc = frappe.get_doc({
+						"doctype": "Timesheet Log",
+						"client_uuid": client_uuid,
+						"project_name": project_name,
+						"task_name": task_name,
+						"activity_type": activity_type,
+						"employee_name": emp["employee_name"],
+						"user": session_user,
+						"status": "Completed",
+						"is_billable": is_billable,
+						"from_time": from_time,
+						"to_time": to_time,
+						"duration_minutes": duration_minutes,
+						"total_hours": total_hours,
+						"accomplishments": description
+					})
+					doc.insert(ignore_permissions=True)
+
+				processed_ids.append(client_uuid)
+				results.append({
+					"client_uuid": client_uuid,
+					"status": "synced",
+					"server_name": doc.name
+				})
 
 		except Exception as e:
-			# Roll back ONLY this row's savepoint
 			frappe.db.rollback(save_point=savepoint_name)
 			frappe.clear_messages()
-
-			# Extract human-readable error string
 			err_msg = str(e)
 			if hasattr(e, "message") and e.message:
 				err_msg = str(e.message)
@@ -282,7 +482,6 @@ def sync_offline_queue(queue=None):
 				"error": err_msg
 			})
 
-	# Commit all valid rows in the batch
 	frappe.db.commit()
 
 	return {
@@ -296,7 +495,8 @@ def sync_offline_queue(queue=None):
 @frappe.whitelist()
 def get_my_timesheets(year=None, month=None, date=None, limit=100):
 	"""
-	Returns timesheets with monthly aggregation for Google Calendar and date-filtered daily logs.
+	Returns timesheets with monthly aggregation for Google Calendar, date-filtered daily logs,
+	and currently active draft sessions.
 	Enforces user data isolation for standard employees.
 	"""
 	if frappe.session.user == "Guest":
@@ -309,6 +509,7 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 			"month_total_hours": 0.0,
 			"today_total_hours": 0.0,
 			"daily_summary": {},
+			"active_drafts": [],
 			"logs": []
 		}
 
@@ -331,9 +532,10 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 	else:
 		end_of_month = f"{target_year:04d}-{target_month+1:02d}-01 00:00:00"
 
-	# 1. Fetch month records for Calendar Aggregation
+	# 1. Fetch completed month records for Calendar Aggregation (strictly status != 'Draft' & != 'Cancelled')
 	month_filters = {
 		"from_time": ["between", [start_of_month, end_of_month]],
+		"status": ["in", ["Completed", "Billed"]],
 		**user_filters
 	}
 	month_logs = frappe.get_all(
@@ -355,11 +557,15 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 		if dt_str == today_date_str:
 			today_total_minutes += mins
 
-	# Calculate today's hours if not in current query range
+	# Calculate today's completed hours if not in current query range
 	if today_date_str not in raw_day_minutes:
 		today_logs = frappe.get_all(
 			"Timesheet Log",
-			filters={"from_time": ["between", [f"{today_date_str} 00:00:00", f"{today_date_str} 23:59:59"]], **user_filters},
+			filters={
+				"from_time": ["between", [f"{today_date_str} 00:00:00", f"{today_date_str} 23:59:59"]],
+				"status": ["in", ["Completed", "Billed"]],
+				**user_filters
+			},
 			fields=["duration_minutes", "total_hours"]
 		)
 		today_total_minutes = sum(float(t.duration_minutes or 0) for t in today_logs)
@@ -409,8 +615,28 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 			"status": status
 		}
 
-	# 2. Fetch table logs
-	table_filters = {**user_filters}
+	# 2. Fetch active draft sessions
+	active_drafts = frappe.get_all(
+		"Timesheet Log",
+		filters={"status": "Draft", **user_filters},
+		fields=[
+			"name",
+			"client_uuid",
+			"project_name",
+			"task_name",
+			"activity_type",
+			"employee_name",
+			"user",
+			"from_time",
+			"is_billable",
+			"status",
+			"creation"
+		],
+		order_by="from_time desc"
+	)
+
+	# 3. Fetch table logs
+	table_filters = {**user_filters, "status": ["!=", "Cancelled"]}
 	if date:
 		table_filters["from_time"] = ["between", [f"{date} 00:00:00", f"{date} 23:59:59"]]
 
@@ -446,6 +672,7 @@ def get_my_timesheets(year=None, month=None, date=None, limit=100):
 		"month_total_hours": round(month_total_minutes / 60.0, 2),
 		"today_total_hours": round(today_total_minutes / 60.0, 2),
 		"daily_summary": daily_summary,
+		"active_drafts": active_drafts,
 		"logs": logs
 	}
 

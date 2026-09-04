@@ -15,9 +15,10 @@ class TimesheetLog(Document):
 			self.employee_name = emp.get("employee_name")
 
 	def validate(self):
-		# 1. Mandatory Accomplishment Guard
-		if not self.accomplishments or not self.accomplishments.strip():
-			frappe.throw(_("Accomplishments cannot be empty. Please document what was completed."))
+		# 1. Mandatory Accomplishment Guard: strictly required upon completion
+		if self.status == "Completed":
+			if not self.accomplishments or not self.accomplishments.strip():
+				frappe.throw(_("Accomplishments cannot be empty when completing a timesheet session. Please document what was completed."))
 
 		# 2. Permission Guard: Prevent standard employees from creating or modifying logs for another user
 		current_user = frappe.session.user

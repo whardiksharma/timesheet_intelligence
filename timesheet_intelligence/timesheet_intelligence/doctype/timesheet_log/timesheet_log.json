@@ -70,13 +70,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Completed",
+   "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nCompleted\nBilled"
+   "options": "Draft\nCompleted\nBilled\nCancelled"
   },
   {
    "default": "1",
